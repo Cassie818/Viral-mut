@@ -34,11 +34,26 @@ def plot_histogram(Pathogenic_list: List, benign_list: List, bins=50):
     - benign_list: list or array of values representing benign data.
     - bins: number of bins to use in the histograms (default is 50).
     """
-    plt.hist(Pathogenic_list, bins=bins, alpha=0.6, color='orange', label='ClinVar: pathogenic', edgecolor='black')
-    plt.hist(benign_list, bins=bins, alpha=0.5, color='blue', label='ClinVar: benign', edgecolor='black')
+    plt.hist(Pathogenic_list,
+             bins=bins,
+             alpha=0.6,
+             color='orange',
+             label='ClinVar: pathogenic',
+             edgecolor='black')
+    plt.hist(benign_list,
+             bins=bins,
+             alpha=0.5,
+             color='blue',
+             label='ClinVar: benign',
+             edgecolor='black')
 
     plt.title('ESM2-150M')
     plt.xlabel('LLR')
     plt.ylabel('Frequency')
     plt.legend()
     plt.show()
+
+
+def flatten(nested_list: List) -> List:
+    return [item for sublist in nested_list for item in flatten(sublist)] if isinstance(nested_list, list) else [
+        nested_list]

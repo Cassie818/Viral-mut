@@ -1,30 +1,9 @@
 import pandas as pd
 import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
+import pickle
+from bin.helpers import flatten
 from bin.params import amino_acid_dict
 from typing import List
-
-
-# Function to plot the distribution of grammaticality at a specific site
-def plot_distribution(df: pd.DataFrame, site: int) -> None:
-    """
-    Plots the distribution of grammaticality values for a given site.
-
-    Args:
-        df (pd.DataFrame): Dataframe containing grammaticality values.
-        site (int): The site (1-based index) for which the distribution is plotted.
-    """
-    row = df.iloc[site - 1]
-
-    plt.figure(figsize=(12, 6))
-    sns.barplot(x=row.index, y=row.values)
-    plt.title(f"Distribution of grammaticality in Site {site}", fontsize=16)
-    plt.xlabel("Tokens", fontsize=12)
-    plt.ylabel("Values", fontsize=12)
-    plt.xticks(rotation=90)
-    plt.tight_layout()
-    plt.show()
 
 
 # Function to extract mutation information from the dataframe
@@ -47,7 +26,8 @@ def extract_mutation_info(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # Function to calculate log-likelihood ratios
-def calculate_llr(df: pd.DataFrame, grammaticality: pd.DataFrame) -> List[float]:
+def calculate_llr(df: pd.DataFrame,
+                  grammaticality: pd.DataFrame) -> List[float]:
     """
     Calculates the log-likelihood ratio (LLR) for each mutation.
 
@@ -106,3 +86,13 @@ if __name__ == "__main__":
         # Append results to the lists
         LLR_benign_list.append(LLR_benign)
         LLR_Pathogenic_list.append(LLR_pathogenic)
+
+    benign_list = flatten(LLR_benign_list)
+    Pathogenic_list = flatten(LLR_Pathogenic_list)
+
+    # Save files
+    with open('./data/ESM2_LLR_benign.txt', 'wb') as f:
+        pickle.dump(benign_list, f)
+
+    with open('./data/ESM2_LLR_Pathogenic.txt', 'wb') as f:
+        pickle.dump(Pathogenic_list, f)
