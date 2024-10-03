@@ -78,8 +78,10 @@ def prepare_grammaticality_data(model_name: str,
 
     # Load grammaticality data from CSV
     grammaticality: pd.DataFrame = pd.read_csv(output_csv_path)
-    grammaticality = grammaticality[['A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L',
-                                     'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y']]
+    grammaticality = grammaticality[['A', 'C', 'D', 'E', 'F',
+                                     'G', 'H', 'I', 'K', 'L',
+                                     'M', 'N', 'P', 'Q', 'R', 
+                                     'S', 'T', 'V', 'W', 'Y']]
     return grammaticality
 
 
