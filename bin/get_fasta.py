@@ -1,6 +1,5 @@
 from Bio import Entrez, SeqIO, Seq
 from Bio.SeqRecord import SeqRecord
-import pandas as pd
 
 # Set your email. NCBI requires this.
 Entrez.email = "ruyic818@gmail.com"  # Replace with your actual email
