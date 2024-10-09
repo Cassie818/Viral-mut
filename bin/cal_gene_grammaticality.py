@@ -34,39 +34,6 @@ def extract_mutation_info(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def read_fasta_nuc(file_path: str) -> List[Tuple[str, str]]:
-    """
-    Reads a nucleotide sequence from a FASTA file.
-
-    Parameters:
-    - file_path: string, path to the FASTA file.
-
-    Returns:
-    - sequences: list of tuples containing the ID and sequence from the FASTA file.
-    """
-    sequences: List[Tuple[str, str]] = []
-    current_id: str = ""
-    current_sequence: List[str] = []
-
-    with open(file_path, 'r') as fasta_file:
-        for line in fasta_file:
-            line = line.strip()  # Remove whitespace
-            if line.startswith(">"):
-                # Save the previous sequence before starting a new one
-                if current_id and current_sequence:
-                    sequences.append((current_id, "".join(current_sequence)))
-                current_id = line[1:]  # Extract ID from the FASTA header
-                current_sequence = []  # Reset sequence
-            else:
-                current_sequence.append(line)
-
-        # Add the last sequence after the loop ends
-        if current_id and current_sequence:
-            sequences.append((current_id, "".join(current_sequence)))
-
-    return sequences
-
-
 def _split_into_codons(seq: str) -> List[str]:
     for i in range(0, len(seq), 3):
         yield seq[i:i + 3]
@@ -96,18 +63,16 @@ class CaLMPluS(CaLM):
         Raises:
         - ValueError: If the input sequence is not a string or CodonSequence.
         """
-        # Check if the input sequence is a string or CodonSequence instance.
-        # Convert string to a CodonSequence if necessary.
+
         if isinstance(sequence, str):
-            seq: CodonSequence = CodonSequence(sequence)  # Convert string to CodonSequence type.
+            seq: CodonSequence = CodonSequence(sequence)
         elif isinstance(sequence, CodonSequence):
             seq: CodonSequence = sequence
         else:
-            # Raise an error if the input is neither a string nor a CodonSequence.
             raise ValueError('The input sequence must be a string or a CodonSequence instance.')
 
         # Tokenize the codon sequence into a format that the model can understand.
-        tokens = self.tokenize(seq)  # Expected to be a tensor or similar type that can be used by the model.
+        tokens = self.tokenize(seq)
 
         # Pass the tokens to the model to generate output.
         output = self.model(tokens)
@@ -121,21 +86,52 @@ class CaLMPluS(CaLM):
         return logits
 
 
+def read_fasta_nuc(file_path: str) -> List[Tuple[str, str]]:
+    """
+    Reads nucleotide sequences from a FASTA file and returns a list of tuples containing IDs and sequences.
+
+    Args:
+        file_path (str): Path to the FASTA file.
+
+    Returns:
+        List[Tuple[str, str]]: A list of tuples where each tuple contains an ID and its corresponding nucleotide sequence.
+    """
+    sequences: List[Tuple[str, str]] = []
+    current_id: str = ""
+    current_sequence: List[str] = []
+
+    with open(file_path, 'r') as fasta_file:
+        for line in fasta_file:
+            line = line.strip()
+            if line.startswith(">"):
+                if current_id:
+                    sequences.append((current_id, "".join(current_sequence)))
+                current_id = line[1:]
+                current_sequence = []
+            else:
+                current_sequence.append(line)
+
+        if current_id:
+            sequences.append((current_id, "".join(current_sequence)))
+
+    return sequences
+
+
 if __name__ == "__main__":
-    calm_model = CaLMPluS()
-    gene_list = ['IRF6']
+    calm = CaLMPluS()
+    gene_list = pd.read_csv("../data/gene_info.txt", sep="\t", header=None)[0].tolist()
 
     for gene in gene_list:
-        seq_path = f"./data/{gene}.faa"
+
+        seq_path = f"../data/Gene/{gene}.fasta"
         sequence = read_fasta_nuc(seq_path)[0][1]
         # remove the start token and end token
-        logits = calm_model.get_logits(sequence)[:, 1:-1, ]
-        print("Logits shape:", logits.shape)
+        logits = calm.get_logits(sequence)[:, 1:-1, ]
 
-        tok_to_idx = calm_model.alphabet.tok_to_idx
+        tok_to_idx = calm.alphabet.tok_to_idx
         codons = [i for i in tok_to_idx]
 
-        csv_fname = f"./data/{gene}_CaLM_grammaticality.csv"
+        csv_fname = f"../Results2/{gene}_CaLM_grammaticality.csv"
 
         with open(csv_fname, 'w', newline='') as csvfile:
             csv_writer = csv.writer(csvfile)

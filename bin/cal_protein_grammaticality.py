@@ -78,7 +78,6 @@ def prepare_grammaticality_data(model_name: str,
         for i, tokens_len in enumerate(batch_lens):
             logits: torch.Tensor = results["logits"]  # Shape [batch_size, seq_length, alphabet_size]
             grammaticality: np.ndarray = F.softmax(logits[i, 1:tokens_len - 1], dim=-1).cpu().numpy()
-            print(grammaticality.shape)
             # grammaticality: numpy.ndarray -> Shape [sequence_length, alphabet_size]
 
             csv_writer.writerows(grammaticality)

@@ -1,8 +1,8 @@
 from Bio import Entrez, SeqIO, Seq
 from Bio.SeqRecord import SeqRecord
 
-# Set your email. NCBI requires this.
-Entrez.email = "ruyic818@gmail.com"  # Replace with your actual email
+# Set email
+Entrez.email = "ruyic818@gmail.com"
 
 
 def write_fasta_file(records, filename):
