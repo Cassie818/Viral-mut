@@ -1,5 +1,6 @@
 from Bio import Entrez, SeqIO, Seq
 from Bio.SeqRecord import SeqRecord
+import pandas as pd
 
 # Set email
 Entrez.email = "ruyic818@gmail.com"
@@ -25,7 +26,7 @@ def write_fasta_file(records, filename):
         print(f"An error occurred while writing to {filename}: {e}")
 
 
-def fetch_cds_and_protein_sequences(accession):
+def fetch_cds_and_protein_sequences(accession, gene):
     try:
         # Fetch the GenBank record
         with Entrez.efetch(db="nucleotide", id=accession, rettype="gb", retmode="text") as handle:
@@ -79,15 +80,9 @@ def fetch_cds_and_protein_sequences(accession):
 
             protein_records.append(protein_record)
 
-        # Determine the gene name for file naming
-        # If multiple genes are present, you might need to adjust this logic
-        # Here, we'll use the first gene name found; otherwise, default to 'UnknownGene'
-        gene_names = [record.qualifiers.get("gene", ["UnknownGene"])[0] for record in cds_features]
-        gene = gene_names[0] if gene_names else "UnknownGene"
-
         # Define output file paths
-        cds_output_file = f"../data/ClinVar/gene/{gene}.fasta"
-        protein_output_file = f"../data/ClinVar/protein/{gene}_protein.fasta"
+        cds_output_file = f"./data/Gene/{gene}.fasta"
+        protein_output_file = f"./data/Protein/{gene}_protein.fasta"
 
         # Write CDS sequences to FASTA without wrapping
         write_fasta_file(cds_records, cds_output_file)
@@ -100,10 +95,11 @@ def fetch_cds_and_protein_sequences(accession):
 
 
 if __name__ == "__main__":
-    # Open the text file and read all the accession numbers
-    with open("accession_numbers.txt", "r") as file:
-        accession_numbers = file.read().splitlines()  # Read each line, remove newline characters
 
-    # Loop through each accession number and call the function
-    for accession_number in accession_numbers:
-        fetch_cds_and_protein_sequences(accession_number)
+    gene_info = pd.read_csv("Clinvar_gene_info.csv")
+    tuple_of_gene = tuple(gene_info.to_records(index=False))
+
+    for record in tuple_of_gene:
+      gene = record[0]
+      accession = record[1]
+      fetch_cds_and_protein_sequences(accession, gene)

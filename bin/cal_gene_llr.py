@@ -4,7 +4,7 @@ from bin.helpers import flatten
 import pickle
 from bin.cal_gene_grammaticality import read_fasta_nuc
 
-from typing import List, Tuple
+from typing import List
 
 
 def extract_mutation_info(df: pd.DataFrame) -> pd.DataFrame:
