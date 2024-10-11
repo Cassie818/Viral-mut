@@ -81,8 +81,8 @@ def fetch_cds_and_protein_sequences(accession, gene):
             protein_records.append(protein_record)
 
         # Define output file paths
-        cds_output_file = f"./data/Gene/{gene}.fasta"
-        protein_output_file = f"./data/Protein/{gene}_protein.fasta"
+        cds_output_file = f"../data/ClinVar/Gene/{gene}.fasta"
+        protein_output_file = f"../data/ClinVar/Protein/{gene}_protein.fasta"
 
         # Write CDS sequences to FASTA without wrapping
         write_fasta_file(cds_records, cds_output_file)

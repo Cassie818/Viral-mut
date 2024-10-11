@@ -76,7 +76,7 @@ def calculate_llr(row: pd.Series,
     mut = row['Mut']
 
     # Skip termination mutation
-    if pd.isna(mut):
+    if pd.isna(mut) or pd.isna(ref):
         print(f"Skipping termination mutation for Gene={gene}, Site={aasite}.")
 
     else:
