@@ -1,98 +1,277 @@
 import pandas as pd
 import numpy as np
-import pickle
-from bin.helpers import flatten
-from bin.params import amino_acid_dict
 from typing import List
+import re
+import os
+import csv
+import logging
+from params import amino_acid_dict
 
 
-# Function to extract mutation information from the dataframe
+def flatten(nested_list: List) -> List:
+    """
+    Flattens a nested list into a single-level list.
+
+    Args:
+        nested_list (List): The list to flatten.
+
+    Returns:
+        List: A flattened list.
+    """
+    return [item for sublist in nested_list for item in flatten(sublist)] if isinstance(nested_list, list) else [
+        nested_list]
+
+
 def extract_mutation_info(df: pd.DataFrame) -> pd.DataFrame:
     """
     Extracts mutation information including reference and mutant amino acids, and site positions.
 
     Args:
-        df (pd.DataFrame): Dataframe containing mutation data.
+        df (pd.DataFrame): DataFrame containing mutation data.
 
     Returns:
-        pd.DataFrame: Updated dataframe with additional columns for mutation details.
+        pd.DataFrame: Updated DataFrame with additional columns for mutation details.
     """
-    # Extract amino acid mutation information
-    df['aaMut'] = df['Name'].str.extract(r'(p\.\w+\d+\w+)')
-    df['aaSite'] = df['aaMut'].str.extract(r'(\d+)').astype(int)  # Numeric site positions
-    df['Ref'] = df['aaMut'].str.extract(r'p\.([A-Za-z]{3})\d+').map(amino_acid_dict)  # Reference amino acid
-    df['Mut'] = df['aaMut'].str.extract(r'p\.[A-Za-z]{3}\d+([A-Za-z]{3})').map(amino_acid_dict)  # Mutant amino acid
+
+    def process_row(row):
+        # Extract aaMut
+        aaMut_match = re.search(r'(p\.\w+\d+\w+)', row['Name'])
+        row['aaMut'] = aaMut_match.group(1) if aaMut_match else np.nan
+
+        # Extract Site
+        aaSite_match = re.search(r'(\d+)', row['aaMut']) if pd.notna(row['aaMut']) else None
+        row['aaSite'] = int(aaSite_match.group(1)) if aaSite_match else np.nan
+
+        # Extract Ref
+        ref_match = re.search(r'p\.([A-Za-z]{3})\d+', row['aaMut']) if pd.notna(row['aaMut']) else None
+        row['Ref'] = amino_acid_dict.get(ref_match.group(1), np.nan) if ref_match else np.nan
+
+        # Extract Mut
+        mut_match = re.search(r'p\.[A-Za-z]{3}\d+([A-Za-z]{3})', row['aaMut']) if pd.notna(row['aaMut']) else None
+        row['Mut'] = amino_acid_dict.get(mut_match.group(1), np.nan) if mut_match else np.nan
+
+        return row
+
+    # No print statements here to focus solely on LLR calculations
+    df = df.apply(process_row, axis=1)
     return df
 
 
-# Function to calculate log-likelihood ratios
-def calculate_llr(df: pd.DataFrame,
-                  grammaticality: pd.DataFrame) -> List[float]:
+def calculate_llr(row: pd.Series,
+                  grammaticality: pd.DataFrame,
+                  gene: str) -> float:
     """
-    Calculates the log-likelihood ratio (LLR) for each mutation.
+    Calculates the log-likelihood ratio (LLR) for a single mutation.
 
     Args:
-        df (pd.DataFrame): Dataframe containing mutation information.
-        grammaticality (pd.DataFrame): Dataframe with grammaticality values for each site and amino acid.
+        row (pd.Series): A row from the DataFrame containing mutation information.
+        grammaticality (pd.DataFrame): DataFrame with grammaticality values for each site and amino acid.
+        gene (str): The gene associated with the mutation.
 
     Returns:
-        List[float]: List of LLR values for the given mutations.
+        float: The LLR value for the given mutation.
     """
-    LLR = []
-    for _, row in df.iterrows():
-        aasite = row['aaSite']
-        ref = row['Ref']
-        mut = row['Mut']
+    aasite = row['aaSite']
+    ref = row['Ref']
+    mut = row['Mut']
 
-        # Retrieve the grammaticality values for the reference and mutant codons
-        wt = grammaticality.iloc[aasite - 1][ref]
-        mt = grammaticality.iloc[aasite - 1][mut]
+    # Skip termination mutation
+    if pd.isna(mut):
+        print(f"Skipping termination mutation for Gene={gene}, Site={aasite}.")
+
+    else:
+        # Access grammaticality values using row index and column label
+        wt = grammaticality.loc[aasite - 1, ref]
+        mt = grammaticality.loc[aasite - 1, mut]
 
         # Calculate log-likelihood ratio (LLR)
         llr = np.log(mt) - np.log(wt)
-        LLR.append(llr)
+        print(f"Calculated LLR for Gene={gene}, Site={aasite}, Ref={ref}, Mut={mut}: LLR={llr}")
+        return llr
 
-    return LLR
+
+def initialize_output_file(output_path: str):
+    """
+    Initializes the output CSV file with headers.
+
+    Args:
+        output_path (str): Path to the output CSV file.
+    """
+    headers = ['Label', 'Gene', 'Site', 'Ref', 'Mut', 'LLR']
+    with open(output_path, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(headers)
+
+
+def append_batch_to_output_file(output_path: str,
+                                batch_data: List):
+    """
+    Appends a batch of data to the output CSV file.
+
+    Args:
+        output_path (str): Path to the output CSV file.
+        batch_data (List): List of rows to append, each row is a list.
+    """
+    with open(output_path, mode='a', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerows(batch_data)
+
+
+def setup_logging():
+    """
+    Configures the logging settings.
+    """
+    logging.basicConfig(
+        filename='processing.log',
+        filemode='a',
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
+
+
+def validate_data(df: pd.DataFrame) -> bool:
+    """
+    Validates that the DataFrame contains the required columns.
+
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+
+    Returns:
+        bool: True if validation passes, False otherwise.
+    """
+    required_columns = ['Name']
+    for col in required_columns:
+        if col not in df.columns:
+            print(f"Validation Error: Missing required column '{col}'.")
+            return False
+    return True
+
+
+def process_data(data: pd.DataFrame,
+                 label: str,
+                 output_dir: str,
+                 batch_size: int = 100):
+    """
+    Processes the mutation data by extracting mutation information and calculating LLR.
+    Immediately saves gene site and LLR to an output file in batches.
+
+    Args:
+        data (pd.DataFrame): The input mutation data.
+        label (str): Label to identify the dataset (e.g., 'benign', 'pathogenic').
+        output_dir (str): Directory where the output file will be saved.
+        batch_size (int): Number of rows to write in each batch.
+
+    Returns:
+        None
+    """
+    if not validate_data(data):
+        logging.error(f"Data validation failed for label: {label}")
+        print(f"Data validation failed for '{label}' dataset. Skipping processing.")
+        return
+
+    processed_data = extract_mutation_info(data)
+
+    # Define output file path
+    output_path = os.path.join(output_dir, f'{label}_LLR_results.csv')
+
+    # Initialize the output file with headers
+    initialize_output_file(output_path)
+
+    batch_data = []
+    total_processed = 0
+    total_skipped = 0
+
+    for idx, row in processed_data.iterrows():
+        # Use a regular expression to extract the content inside parentheses
+        gene_match = re.search(r'\(([^)]+)\)', row['Name'])
+        gene = gene_match.group(1) if gene_match else None
+
+        if gene:
+            grammaticality_file = f"./Results/Protein/{gene}_ESM2_grammaticality.csv"
+            if not os.path.isfile(grammaticality_file):
+                logging.error(f"File not found: {grammaticality_file}")
+                total_skipped += 1
+                continue
+
+            try:
+                grammaticality = pd.read_csv(grammaticality_file, sep=',')
+            except Exception as e:
+                logging.error(f"Error reading {grammaticality_file}: {e}")
+                total_skipped += 1
+                continue
+
+            # Calculate LLR for the current row, passing the gene name
+            llr = calculate_llr(row, grammaticality, gene)
+
+            # Prepare data to append
+            output_row = [
+                label,
+                gene,
+                row['aaSite'],
+                row['Ref'],
+                row['Mut'],
+                llr
+            ]
+
+            batch_data.append(output_row)
+            total_processed += 1
+
+            # Write batch to file if batch size is reached
+            if len(batch_data) >= batch_size:
+                append_batch_to_output_file(output_path, batch_data)
+                logging.info(f"Appended batch of {len(batch_data)} rows to {output_path}")
+                batch_data = []
+
+    # Write any remaining data in the batch
+    if batch_data:
+        append_batch_to_output_file(output_path, batch_data)
+        logging.info(f"Appended final batch of {len(batch_data)} rows to {output_path}")
+
+    print(f"Completed processing for '{label}' dataset.")
+    print(f"Total LLR calculations performed: {total_processed}")
+    print(f"Total mutations skipped: {total_skipped}")
+
+
+def main():
+    # Setup logging
+    setup_logging()
+
+    # Define the directory where output files will be saved
+    output_dir = "./LLR"
+    os.makedirs(output_dir, exist_ok=True)
+
+    try:
+        benign_data = pd.read_csv('benign_data.csv')
+        logging.info("Loaded benign_data.csv successfully.")
+    except Exception as e:
+        print(f"Error loading 'benign_data.csv': {e}")
+        logging.error(f"Error loading benign_data.csv: {e}")
+        benign_data = pd.DataFrame()
+
+    try:
+        pathogenic_data = pd.read_csv('pathogenic_data.csv')
+        logging.info("Loaded pathogenic_data.csv successfully.")
+    except Exception as e:
+        print(f"Error loading 'pathogenic_data.csv': {e}")
+        logging.error(f"Error loading pathogenic_data.csv: {e}")
+        pathogenic_data = pd.DataFrame()
+
+    # Process both benign and pathogenic datasets
+    if not benign_data.empty:
+        process_data(benign_data, 'benign', output_dir)
+    else:
+        print("Benign data is empty. Skipping processing for benign dataset.")
+        logging.warning("Benign data is empty. Skipping processing for benign dataset.")
+
+    if not pathogenic_data.empty:
+        process_data(pathogenic_data, 'pathogenic', output_dir)
+    else:
+        print("Pathogenic data is empty. Skipping processing for pathogenic dataset.")
+        logging.warning("Pathogenic data is empty. Skipping processing for pathogenic dataset.")
+
+    print("All datasets have been processed.")
+    logging.info("Completed processing of mutation data.")
 
 
 if __name__ == "__main__":
-    # List of genes to be processed
-    Gene_list = ['IRF6']
-
-    # Lists to store LLR values for benign and pathogenic mutations
-    LLR_Pathogenic_list = []
-    LLR_benign_list = []
-
-    for gene in Gene_list:
-        # Load grammaticality data
-        grammaticality_file = f"./data/{gene}_ESM2_grammaticality.csv"
-        grammaticality = pd.read_csv(grammaticality_file, sep=',')
-
-        # Load benign and pathogenic mutation data
-        benign_info_file = f"./data/{gene}_benign.txt"
-        pathogenic_info_file = f"./data/{gene}.txt"
-
-        benign_info = pd.read_csv(benign_info_file, sep='\t')
-        pathogenic_info = pd.read_csv(pathogenic_info_file, sep='\t')
-
-        # Extract mutation information
-        benign_mutations = extract_mutation_info(benign_info)
-        pathogenic_mutations = extract_mutation_info(pathogenic_info)
-
-        # Calculate LLR for benign and pathogenic mutations
-        LLR_benign = calculate_llr(benign_mutations, grammaticality)
-        LLR_pathogenic = calculate_llr(pathogenic_mutations, grammaticality)
-
-        # Append results to the lists
-        LLR_benign_list.append(LLR_benign)
-        LLR_Pathogenic_list.append(LLR_pathogenic)
-
-    benign_list = flatten(LLR_benign_list)
-    Pathogenic_list = flatten(LLR_Pathogenic_list)
-
-    # Save files
-    with open('./data/ESM2_LLR_benign.txt', 'wb') as f:
-        pickle.dump(benign_list, f)
-
-    with open('./data/ESM2_LLR_Pathogenic.txt', 'wb') as f:
-        pickle.dump(Pathogenic_list, f)
+    main()
