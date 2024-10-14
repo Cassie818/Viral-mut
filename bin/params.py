@@ -88,3 +88,27 @@ codon_to_amino_acid = {
     'GGC': 'G',   # Glycine
     'GGG': 'G'    # Glycine
 }
+
+amino_acid_to_codons = {
+    'K': ['AAA', 'AAG'],                          # Lysine
+    'N': ['AAU', 'AAC'],                          # Asparagine
+    'I': ['AUA', 'AUU', 'AUC'],                   # Isoleucine
+    'M': ['AUG'],                                 # Methionine
+    'T': ['ACA', 'ACU', 'ACC', 'ACG'],            # Threonine
+    'R': ['AGA', 'AGG', 'CGA', 'CGU', 'CGC', 'CGG'], #Arginine
+    'S': ['AGU', 'AGC', 'UCA', 'UCU', 'UCC', 'UCG'], # Serine
+    '*': ['UAA', 'UAG', 'UGA'],                   # Stop codons
+    'Y': ['UAU', 'UAC'],                          # Tyrosine
+    'L': ['UUA', 'UUG', 'CUA', 'CUU', 'CUC', 'CUG'], # Leucine
+    'F': ['UUU', 'UUC'],                          # Phenylalanine
+    'C': ['UGU', 'UGC'],                          # Cysteine
+    'W': ['UGG'],                                 # Tryptophan
+    'Q': ['CAA', 'CAG'],                          # Glutamine
+    'H': ['CAU', 'CAC'],                          # Histidine
+    'P': ['CCA', 'CCU', 'CCC', 'CCG'],            # Proline
+    'E': ['GAA', 'GAG'],                          # Glutamic Acid
+    'D': ['GAU', 'GAC'],                          # Aspartic Acid
+    'V': ['GUA', 'GUU', 'GUC', 'GUG'],            # Valine
+    'A': ['GCA', 'GCU', 'GCC', 'GCG'],            # Alanine
+    'G': ['GGA', 'GGU', 'GGC', 'GGG']             # Glycine
+}
