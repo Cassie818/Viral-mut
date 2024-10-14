@@ -12,7 +12,7 @@ def filter_clinvar_data(df):
     """Filter ClinVar data based on specific criteria."""
     # Filtering criteria
     germline_classifications = ['Benign', 'Likely benign', 'Likely pathogenic', 'Pathogenic']
-    variation_type = 'single nucleotide variant'  # Adjust based on actual Type column values
+    variation_type = 'single nucleotide variant'
 
     # Filter data
     filtered_df = df[
@@ -22,6 +22,10 @@ def filter_clinvar_data(df):
                 (df['ReviewStatus'].str.contains('criteria provided, multiple submitters, no conflicts',
                                                  case=False, na=False)) |
                 (df['ReviewStatus'].str.contains('criteria provided, single submitter',
+                                                 case=False, na=False)) |
+                (df['ReviewStatus'].str.contains('reviewed by expert panel',
+                                                 case=False, na=False)) |
+                (df['ReviewStatus'].str.contains('practice guideline',
                                                  case=False, na=False))
         )
         ]
