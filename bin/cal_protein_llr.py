@@ -86,7 +86,7 @@ def calculate_llr(row: pd.Series,
 
         # Calculate log-likelihood ratio (LLR)
         llr = np.log(mt) - np.log(wt)
-        print(f"Calculated LLR for Gene={gene}, Site={aasite}, Ref={ref}, Mut={mut}: LLR={llr}")
+        print(f"Calculated LLR for Gene={gene}, Site={aasite}, Ref={ref}, Mut={mut}, LLR={llr}")
         return llr
 
 

@@ -112,3 +112,20 @@ amino_acid_to_codons = {
     'A': ['GCA', 'GCU', 'GCC', 'GCG'],            # Alanine
     'G': ['GGA', 'GGU', 'GGC', 'GGG']             # Glycine
 }
+
+codon_list = ['AAA', 'AAU', 'AAC', 'AAG',
+              'AUA', 'AUU', 'AUC', 'AUG',
+              'ACA', 'ACU', 'ACC', 'ACG',
+              'AGA', 'AGU', 'AGC', 'AGG',
+              'UAA', 'UAU', 'UAC', 'UAG',
+              'UUA', 'UUU', 'UUC', 'UUG',
+              'UCA', 'UCU', 'UCC', 'UCG',
+              'UGA', 'UGU', 'UGC', 'UGG',
+              'CAA', 'CAU', 'CAC', 'CAG',
+              'CUA', 'CUU', 'CUC', 'CUG',
+              'CCA', 'CCU', 'CCC', 'CCG',
+              'CGA', 'CGU', 'CGC', 'CGG',
+              'GAA', 'GAU', 'GAC', 'GAG',
+              'GUA', 'GUU', 'GUC', 'GUG',
+              'GCA', 'GCU', 'GCC', 'GCG',
+              'GGA', 'GGU', 'GGC', 'GGG']

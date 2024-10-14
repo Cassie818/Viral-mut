@@ -1,7 +1,8 @@
 from bin.cal_gene_grammaticality import read_fasta_nuc
+from bin.params import codon_list
 import pandas as pd
 import numpy as np
-from typing import List, Tuple
+from typing import List
 import re
 import os
 import csv
@@ -176,15 +177,19 @@ def calculate_llr(row: pd.Series,
 
     row['Ref_codon'] = ref_codon
     row['Mut_codon'] = mut_codon
-    # Retrieve grammaticality scores for the reference and mutant codons
-    wt = grammaticality.iloc[aasite - 1][ref_codon]
-    mt = grammaticality.iloc[aasite - 1][mut_codon]
 
-    # Calculate log-likelihood ratio (LLR)
-    llr = np.log(mt) - np.log(wt)
-    print(f"Calculated LLR for Gene={gene}, Site={aasite}, Ref={ref_codon}, Mut={mut_codon}: LLR={llr}")
+    if ref_codon not in codon_list or mut_codon not in codon_list:
+        print(f"Warning: Reference codon '{ref_codon}' not found in codon list. Skipping!!!")
+    else:
+        # Retrieve grammaticality scores for the reference and mutant codons
+        wt = grammaticality.iloc[aasite - 1][ref_codon]
+        mt = grammaticality.iloc[aasite - 1][mut_codon]
 
-    return llr
+        # Calculate log-likelihood ratio (LLR)
+        llr = np.log(mt) - np.log(wt)
+        print(f"Calculated LLR for Gene={gene}, Site={aasite}, Ref={ref_codon}, Mut={mut_codon}, LLR={llr}")
+
+        return llr
 
 
 def initialize_output_file(output_path: str):
