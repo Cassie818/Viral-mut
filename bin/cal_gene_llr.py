@@ -1,144 +1,374 @@
+from bin.cal_gene_grammaticality import read_fasta_nuc
 import pandas as pd
 import numpy as np
-from bin.helpers import flatten
-import pickle
-from bin.cal_gene_grammaticality import read_fasta_nuc
+from typing import List, Tuple
+import re
+import os
+import csv
+import logging
 
-from typing import List
+
+def flatten(nested_list: List) -> List:
+    """
+    Flattens a nested list into a single-level list.
+
+    Args:
+        nested_list (List): The list to flatten.
+
+    Returns:
+        List: A flattened list.
+    """
+    return [item for sublist in nested_list for item in flatten(sublist)] if isinstance(nested_list, list) else [
+        nested_list]
+
+
+def split_into_codons(seq: str) -> List[str]:
+    """
+    Splits the nucleotide sequence into codons (3 bases each).
+
+    Parameters:
+    - seq: str, nucleotide sequence.
+
+    Returns:
+    - List of 3-base strings (codons).
+    """
+    return [seq[i:i + 3] for i in range(0, len(seq), 3)]
 
 
 def extract_mutation_info(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Extracts detailed mutation information from the 'Name' column of a DataFrame.
+    Extracts mutation information from the 'Name' column of a DataFrame,
+    including reference and mutant codons, and site positions.
 
     Parameters:
-    - df: pandas DataFrame containing a column 'Name' with mutation information.
+    - df (pd.DataFrame): DataFrame containing a 'Name' column with mutation data.
 
     Returns:
-    - df: pandas DataFrame with additional columns for nucleotide mutation,
-          amino acid mutation, numeric sites, and reference/mutant nucleotides.
+    - pd.DataFrame: Updated DataFrame with additional columns for mutation details:
+        - 'ncMut': Nucleotide mutation (e.g., 'c.123A>T')
+        - 'ncSite': Nucleotide mutation position (integer)
+        - 'Ref': Reference nucleotide (single letter)
+        - 'Mut': Mutant nucleotide (single letter)
+        - 'aaMut': Amino acid mutation (e.g., 'p.Arg259Pro')
+        - 'aaSite': Amino acid mutation position (integer)
+        - 'Ref_AA': Reference amino acid (single letter)
+        - 'Mut_AA': Mutant amino acid (single letter)
     """
-    # Extract nucleotide mutation in format 'c.<number><nucleotide1>><nucleotide2>'
-    df['ncMut'] = df['Name'].str.extract(r'(c\.\d+[A-Z]>[A-Z])')
 
-    # Extract amino acid mutation in format 'p.<amino acid><number><amino acid>'
-    df['aaMut'] = df['Name'].str.extract(r'(p\.\w+\d+\w+)')
+    # Precompile regular expressions for efficiency
+    nc_mut_pattern = re.compile(r'(c\.\d+[A-Z]>[A-Z])')
+    nc_site_pattern = re.compile(r'c\.(\d+)')
+    ref_nc_pattern = re.compile(r'c\.\d+([A-Z])>')
+    mut_nc_pattern = re.compile(r'>([A-Z])')
+    aa_mut_pattern = re.compile(r'(p\.[A-Za-z]{3}\d+[A-Za-z]{3})')
+    aa_site_pattern = re.compile(r'^p\.[A-Za-z]{3}(\d+)[A-Za-z]{3}$')  # Refined pattern
+    ref_aa_pattern = re.compile(r'p\.([A-Za-z]{3})\d+[A-Za-z]{3}')
+    mut_aa_pattern = re.compile(r'p\.[A-Za-z]{3}\d+([A-Za-z]{3})')
 
-    # Extract the numeric part of nucleotide and amino acid mutation sites
-    df['ncSite'] = df['ncMut'].str.extract(r'(\d+)')
-    df['aaSite'] = df['aaMut'].str.extract(r'(\d+)')
+    def process_row(row: pd.Series) -> pd.Series:
+        """
+        Processes a single row to extract mutation details.
 
-    # Extract the reference nucleotide and mutated nucleotide from ncMut
-    df['Ref'] = df['ncMut'].str.extract(r'([A-Z])>')
-    df['Mut'] = df['ncMut'].str.extract(r'>([A-Z])')
+        Parameters:
+        - row (pd.Series): A row from the DataFrame.
+
+        Returns:
+        - pd.Series: The updated row with extracted mutation information.
+        """
+        name = row.get('Name', '')
+
+        # Initialize new columns with NaN
+        row['ncMut'] = np.nan
+        row['ncSite'] = np.nan
+        row['Ref'] = np.nan
+        row['Mut'] = np.nan
+        row['aaMut'] = np.nan
+        row['aaSite'] = np.nan
+        row['Ref_AA'] = np.nan
+        row['Mut_AA'] = np.nan
+
+        # Debug: Print the current row being processed
+        # print(f"Processing row: {name}")
+
+        # Extract nucleotide mutation
+        ncMut_match = nc_mut_pattern.search(name)
+        if ncMut_match:
+            row['ncMut'] = ncMut_match.group(1)
+
+            # Extract nucleotide mutation position
+            ncSite_match = nc_site_pattern.search(row['ncMut'])
+            if ncSite_match:
+                row['ncSite'] = int(ncSite_match.group(1))
+            else:
+                print(f"Warning: Nucleotide site not found in '{row['ncMut']}'")
+
+            # Extract reference and mutant nucleotides
+            ref_nc_match = ref_nc_pattern.search(row['ncMut'])
+            mut_nc_match = mut_nc_pattern.search(row['ncMut'])
+            if ref_nc_match:
+                row['Ref'] = ref_nc_match.group(1)
+            else:
+                print(f"Warning: Reference nucleotide not found in '{row['ncMut']}'")
+
+            if mut_nc_match:
+                row['Mut'] = mut_nc_match.group(1)
+            else:
+                print(f"Warning: Mutant nucleotide not found in '{row['ncMut']}'")
+
+        # Extract amino acid mutation
+        aaMut_match = aa_mut_pattern.search(name)
+        if aaMut_match:
+            row['aaMut'] = aaMut_match.group(1)
+
+            # Extract amino acid mutation position using refined pattern
+            aaSite_match = aa_site_pattern.search(row['aaMut'])
+            if aaSite_match:
+                row['aaSite'] = int(aaSite_match.group(1))
+            else:
+                print(f"Warning: Amino acid site not found or pattern mismatch in '{row['aaMut']}'")
+
+        return row
+
+    # Apply the row-wise processing function
+    df = df.apply(process_row, axis=1)
 
     return df
 
 
-def calculate_llr(df: pd.DataFrame,
-                  sequence: str,
-                  grammaticality: pd.DataFrame) -> List[float]:
+def calculate_llr(row: pd.Series,
+                  grammaticality: pd.DataFrame,
+                  gene: str) -> float:
     """
-    Calculates the log-likelihood ratio (LLR) for each mutation in the given DataFrame.
+    Calculates the log-likelihood ratio (LLR) for a single mutation.
 
-    Parameters:
-    - df: pandas DataFrame containing mutation information.
-    - sequence: str, the nucleotide sequence of the gene.
-    - grammaticality: pandas DataFrame containing grammaticality scores for each codon.
+    Args:
+        row (pd.Series): A row from the DataFrame containing mutation information.
+        grammaticality (pd.DataFrame): DataFrame with grammaticality values for each site and amino acid.
+        gene (str): The gene associated with the mutation.
 
     Returns:
-    - LLR: List of log-likelihood ratios (LLRs) for each mutation.
+        float: The LLR value for the given mutation.
     """
-    LLR = []
+    ncsite = row['ncSite']
+    aasite = row['aaSite']
+    mtsite = int(ncsite) % 3 - 1
 
-    # Define the split_into_codons function to divide the sequence into triplets (codons)
-    def split_into_codons(seq: str) -> List[str]:
-        """
-        Splits the nucleotide sequence into codons (3 bases each).
+    ref = row['Ref']
+    mut = row['Mut']
 
-        Parameters:
-        - seq: str, nucleotide sequence.
+    # Replace thymine (T) with uracil (U) to represent RNA mutation
+    mtnc = mut.replace('T', 'U')
 
-        Returns:
-        - List of 3-base strings (codons).
-        """
-        return [seq[i:i + 3] for i in range(0, len(seq), 3)]
+    # Read the nucleotide sequence from a FASTA file
+    seq_path = f"./data/Gene/{gene}.fasta"
+    sequence = read_fasta_nuc(seq_path)[0][1]  # Extract the sequence part
 
-    # Iterate over each row of the mutation DataFrame
-    for index, row in df.iterrows():
-        # Extract numeric part of 'ncSite' and 'aaSite' columns (mutation locations)
-        ncs = ''.join(filter(str.isdigit, row['ncSite']))
-        aas = ''.join(filter(str.isdigit, row['aaSite']))
+    # Get reference codon and replace 'T' with 'U' to represent RNA
+    ref_codon = split_into_codons(sequence)[aasite - 1].replace('T', 'U')
 
-        # Replace thymine (T) with uracil (U) to represent RNA mutation
-        mtaa = row['Mut'].replace('T', 'U')
+    # Create the mutant codon by modifying the appropriate base
+    if mtsite < 0:
+        # If mtsite is negative, modify the third base of the codon
+        mut_codon = ref_codon[:2] + mtnc + ref_codon[3:]
+    else:
+        # Otherwise, modify the corresponding base position in the codon
+        mut_codon = ref_codon[:mtsite] + mtnc + ref_codon[mtsite + 1:]
 
-        # Calculate mutation site position within the codon
-        mtsite = int(ncs) % 3 - 1  # Find the position within the codon (0, 1, or 2)
-        aasite = int(aas)  # Amino acid site index
+    row['Ref_codon'] = ref_codon
+    row['Mut_codon'] = mut_codon
+    # Retrieve grammaticality scores for the reference and mutant codons
+    wt = grammaticality.iloc[aasite - 1][ref_codon]
+    mt = grammaticality.iloc[aasite - 1][mut_codon]
 
-        # Get reference codon and replace 'T' with 'U' to represent RNA
-        ref_codon = split_into_codons(sequence)[aasite - 1].replace('T', 'U')
+    # Calculate log-likelihood ratio (LLR)
+    llr = np.log(mt) - np.log(wt)
+    print(f"Calculated LLR for Gene={gene}, Site={aasite}, Ref={ref_codon}, Mut={mut_codon}: LLR={llr}")
 
-        # Create the mutant codon by modifying the appropriate base
-        if mtsite < 0:
-            # If mtsite is negative, modify the third base of the codon
-            mut_codon = ref_codon[:2] + mtaa + ref_codon[3:]
-        else:
-            # Otherwise, modify the corresponding base position in the codon
-            mut_codon = ref_codon[:mtsite] + mtaa + ref_codon[mtsite + 1:]
+    return llr
 
-        # Retrieve grammaticality scores for the reference and mutant codons
-        wt = grammaticality.iloc[aasite - 1][ref_codon]
-        mt = grammaticality.iloc[aasite - 1][mut_codon]
 
-        # Calculate log-likelihood ratio (LLR)
-        llr = np.log(mt) - np.log(wt)
-        LLR.append(llr)
+def initialize_output_file(output_path: str):
+    """
+    Initializes the output CSV file with headers.
 
-    return LLR
+    Args:
+        output_path (str): Path to the output CSV file.
+    """
+    headers = ['Label', 'Gene', 'Site', 'Ref', 'Mut', 'LLR']
+    with open(output_path, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(headers)
+
+
+def append_batch_to_output_file(output_path: str,
+                                batch_data: List):
+    """
+    Appends a batch of data to the output CSV file.
+
+    Args:
+        output_path (str): Path to the output CSV file.
+        batch_data (List): List of rows to append, each row is a list.
+    """
+    with open(output_path, mode='a', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerows(batch_data)
+
+
+def setup_logging():
+    """
+    Configures the logging settings.
+    """
+    logging.basicConfig(
+        filename='processing.log',
+        filemode='a',
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
+
+
+def validate_data(df: pd.DataFrame) -> bool:
+    """
+    Validates that the DataFrame contains the required columns.
+
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+
+    Returns:
+        bool: True if validation passes, False otherwise.
+    """
+    required_columns = ['Name']
+    for col in required_columns:
+        if col not in df.columns:
+            print(f"Validation Error: Missing required column '{col}'.")
+            return False
+    return True
+
+
+def process_data(data: pd.DataFrame,
+                 label: str,
+                 output_dir: str,
+                 batch_size: int = 100):
+    """
+    Processes the mutation data by extracting mutation information and calculating LLR.
+    Immediately saves gene site and LLR to an output file in batches.
+
+    Args:
+        data (pd.DataFrame): The input mutation data.
+        label (str): Label to identify the dataset (e.g., 'benign', 'pathogenic').
+        output_dir (str): Directory where the output file will be saved.
+        batch_size (int): Number of rows to write in each batch.
+
+    Returns:
+        None
+    """
+    if not validate_data(data):
+        logging.error(f"Data validation failed for label: {label}")
+        print(f"Data validation failed for '{label}' dataset. Skipping processing.")
+        return
+
+    processed_data = extract_mutation_info(data)
+
+    # Define output file path
+    output_path = os.path.join(output_dir, f'{label}_LLR_CaLM_results.csv')
+
+    # Initialize the output file with headers
+    initialize_output_file(output_path)
+
+    batch_data = []
+    total_processed = 0
+    total_skipped = 0
+
+    for idx, row in processed_data.iterrows():
+        # Use a regular expression to extract the content inside parentheses
+        gene_match = re.search(r'\(([^)]+)\)', row['Name'])
+        gene = gene_match.group(1) if gene_match else None
+
+        if gene:
+            grammaticality_file = f"./Results/Gene/{gene}_CaLM_grammaticality.csv"
+            if not os.path.isfile(grammaticality_file):
+                logging.error(f"File not found: {grammaticality_file}")
+                total_skipped += 1
+                continue
+
+            try:
+                grammaticality = pd.read_csv(grammaticality_file, sep=',')
+            except Exception as e:
+                logging.error(f"Error reading {grammaticality_file}: {e}")
+                total_skipped += 1
+                continue
+
+            # Calculate LLR for the current row, passing the gene name
+            llr = calculate_llr(row, grammaticality, gene)
+
+            # Prepare data to append
+            output_row = [
+                label,
+                gene,
+                row['aaSite'],
+                row['Ref_codon'],
+                row['Mut_codon'],
+                llr
+            ]
+
+            batch_data.append(output_row)
+            total_processed += 1
+
+            # Write batch to file if batch size is reached
+            if len(batch_data) >= batch_size:
+                append_batch_to_output_file(output_path, batch_data)
+                logging.info(f"Appended batch of {len(batch_data)} rows to {output_path}")
+                batch_data = []
+
+    # Write any remaining data in the batch
+    if batch_data:
+        append_batch_to_output_file(output_path, batch_data)
+        logging.info(f"Appended final batch of {len(batch_data)} rows to {output_path}")
+
+    print(f"Completed processing for '{label}' dataset.")
+    print(f"Total LLR calculations performed: {total_processed}")
+    print(f"Total mutations skipped: {total_skipped}")
+
+
+def main():
+    # Setup logging
+    setup_logging()
+
+    # Define the directory where output files will be saved
+    output_dir = "./LLR"
+    os.makedirs(output_dir, exist_ok=True)
+
+    try:
+        benign_data = pd.read_csv('benign_data.csv')
+        logging.info("Loaded benign_data.csv successfully.")
+    except Exception as e:
+        print(f"Error loading 'benign_data.csv': {e}")
+        logging.error(f"Error loading benign_data.csv: {e}")
+        benign_data = pd.DataFrame()
+
+    try:
+        pathogenic_data = pd.read_csv('pathogenic_data.csv')
+        logging.info("Loaded pathogenic_data.csv successfully.")
+    except Exception as e:
+        print(f"Error loading 'pathogenic_data.csv': {e}")
+        logging.error(f"Error loading pathogenic_data.csv: {e}")
+        pathogenic_data = pd.DataFrame()
+
+    # Process both benign and pathogenic datasets
+    if not benign_data.empty:
+        process_data(benign_data, 'benign', output_dir)
+    else:
+        print("Benign data is empty. Skipping processing for benign dataset.")
+        logging.warning("Benign data is empty. Skipping processing for benign dataset.")
+
+    if not pathogenic_data.empty:
+        process_data(pathogenic_data, 'pathogenic', output_dir)
+    else:
+        print("Pathogenic data is empty. Skipping processing for pathogenic dataset.")
+        logging.warning("Pathogenic data is empty. Skipping processing for pathogenic dataset.")
+
+    print("All datasets have been processed.")
+    logging.info("Completed processing of mutation data.")
 
 
 if __name__ == "__main__":
-    # List of genes to be processed
-    Gene_list = ['IRF6']
-    LLR_Pathogenic_list = []
-    LLR_benign_list = []
-
-    # Process each gene in the Gene_list
-    for gene in Gene_list:
-        # Read grammaticality scores for the given gene from a CSV file
-        file = f"./data/{gene}_CaLM_grammaticality.csv"
-        grammaticality = pd.read_csv(file, sep=',')
-
-        # Read benign mutation information from text file
-        benign_info = pd.read_csv(f"./data/{gene}_benign.txt", sep='\t')
-
-        # Read pathogenic mutation information from text file
-        Pathogenic_info = pd.read_csv(f"./data/{gene}.txt", sep='\t')
-
-        # Extract detailed mutation information for benign and pathogenic mutations
-        benign = extract_mutation_info(benign_info)
-        Pathogenic = extract_mutation_info(Pathogenic_info)
-
-        # Read the nucleotide sequence from a FASTA file
-        seq_path = f"./data/{gene}.faa"
-        sequence = read_fasta_nuc(seq_path)[0][1]  # Extract the sequence part
-
-        # Calculate LLR for benign and pathogenic mutations
-        LLR_benign = calculate_llr(benign, sequence, grammaticality)
-        LLR_Pathogenic = calculate_llr(Pathogenic, sequence, grammaticality)
-
-        # Append LLR values to respective lists
-        LLR_benign_list.append(LLR_benign)
-        LLR_Pathogenic_list.append(LLR_Pathogenic)
-
-    benign_list = flatten(LLR_benign_list)
-    Pathogenic_list = flatten(LLR_Pathogenic_list)
-
-    # Save files
-    with open('./data/CaLM_LLR_benign.txt', 'wb') as f:
-        pickle.dump(benign_list, f)
-
-    with open('./data/CaLM_LLR_Pathogenic.txt', 'wb') as f:
-        pickle.dump(Pathogenic_list, f)
+    main()
