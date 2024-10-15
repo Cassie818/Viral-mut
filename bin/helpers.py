@@ -5,7 +5,8 @@ from typing import List
 
 
 # Function to plot the distribution of grammaticality at a specific site
-def plot_distribution(df: pd.DataFrame, site: int) -> None:
+def plot_distribution(df: pd.DataFrame,
+                      site: int) -> None:
     """
     Plots the distribution of grammaticality values for a given site.
 
@@ -25,32 +26,52 @@ def plot_distribution(df: pd.DataFrame, site: int) -> None:
     plt.show()
 
 
-def plot_histogram(Pathogenic_list: List, benign_list: List, bins=50):
+def plot_histogram(pathogenic_list: List,
+                   benign_list: List,
+                   bins=50):
     """
-    Plots a histogram comparing pathogenic and benign ClinVar data.
+    Plots a histogram comparing pathogenic and benign ClinVar data with enhanced aesthetics.
 
     Parameters:
-    - Pathogenic_list: list or array of values representing pathogenic data.
+    - pathogenic_list: list or array of values representing pathogenic data.
     - benign_list: list or array of values representing benign data.
     - bins: number of bins to use in the histograms (default is 50).
     """
-    plt.hist(Pathogenic_list,
+    sns.set(style="whitegrid", context="talk")
+
+    # Create the plot
+    plt.figure(figsize=(8, 6))
+
+    # Plot the histograms for both lists with enhanced transparency and modern colors
+    plt.hist(pathogenic_list,
              bins=bins,
-             alpha=0.6,
-             color='orange',
-             label='ClinVar: pathogenic',
-             edgecolor='black')
+             alpha=0.5,
+             color='#ff7f0e',  # a soft orange color
+             label='ClinVar: Pathogenic',
+             edgecolor='black',
+             linewidth=1.2)
+
     plt.hist(benign_list,
              bins=bins,
              alpha=0.5,
-             color='blue',
-             label='ClinVar: benign',
-             edgecolor='black')
+             color='#1f77b4',  # a soft blue color
+             label='ClinVar: Benign',
+             edgecolor='black',
+             linewidth=1.2)
 
-    plt.title('ESM2-150M')
+    # Add titles and labels with larger font sizes
+    plt.title('Combined')
     plt.xlabel('LLR')
     plt.ylabel('Frequency')
-    plt.legend()
+    plt.legend(fontsize=12)
+
+    # Display grid for better readability
+    plt.grid(True, linestyle='--', alpha=0.6)
+
+    # Tight layout for better spacing
+    plt.tight_layout()
+
+    # Show the plot
     plt.show()
 
 
