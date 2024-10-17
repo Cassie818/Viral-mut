@@ -1,28 +1,70 @@
-import pandas as pd
-import seaborn as sns
 import matplotlib.pyplot as plt
-from typing import List
+import seaborn as sns
+import pandas as pd
 
 
-# Function to plot the distribution of grammaticality at a specific site
-def plot_distribution(df: pd.DataFrame,
-                      site: int) -> None:
+def load_data(gene: str):
+    protein_data = pd.read_csv(f"Results/Protein/{gene}_ESM2_grammaticality.csv")
+    gene_data = pd.read_csv(f"Results/Gene/{gene}_CaLM_grammaticality.csv")
+    return protein_data, gene_data
+
+
+def plot_distribution(df: pd.DataFrame, site: int, typ: str) -> None:
     """
     Plots the distribution of grammaticality values for a given site.
 
     Args:
         df (pd.DataFrame): Dataframe containing grammaticality values.
         site (int): The site (1-based index) for which the distribution is plotted.
+        typ (str): The type of data, either "protein" or "gene".
     """
+    if typ == "protein":
+        df = df[['A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L',
+                 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y']]
+    else:
+        df = df[['AAA', 'AAU', 'AAC', 'AAG', 'AUA', 'AUU', 'AUC', 'AUG',
+                 'ACA', 'ACU', 'ACC', 'ACG', 'AGA', 'AGU', 'AGC', 'AGG',
+                 'UAA', 'UAU', 'UAC', 'UAG', 'UUA', 'UUU', 'UUC', 'UUG',
+                 'UCA', 'UCU', 'UCC', 'UCG', 'UGA', 'UGU', 'UGC', 'UGG',
+                 'GAA', 'GAU', 'CAC', 'CAG', 'CUA', 'CUU', 'CUC', 'CUG',
+                 'CCA', 'CCU', 'CCC', 'CCG', 'CGA', 'CGU', 'CGC', 'CGG',
+                 'GAA', 'GAU', 'GAC', 'GAG', 'GUA', 'GUU', 'GUC', 'GUG',
+                 'GCA', 'GCU', 'GCC', 'GCG', 'GGA', 'GGU', 'GGC', 'GGG']]
+
     row = df.iloc[site - 1]
 
+    # Use a more refined theme and customize it further
+    sns.set_theme(style="whitegrid")
+
+    # Increase figure size for better readability
     plt.figure(figsize=(12, 6))
-    sns.barplot(x=row.index, y=row.values)
-    plt.title(f"Distribution of grammaticality in Site {site}", fontsize=16)
-    plt.xlabel("Tokens", fontsize=12)
-    plt.ylabel("Values", fontsize=12)
-    plt.xticks(rotation=90)
+
+    # Use a color palette with a gradient for better contrast
+    colors = sns.color_palette("mako", n_colors=len(row))
+
+    # Create the barplot
+    sns.barplot(x=row.index, y=row.values, palette=colors)
+
+    # Add a title with increased font size and padding, without bold or italics
+    plt.title(f"Grammaticality Distribution at Site {site}", fontsize=12, pad=15)
+
+    # Set x and y labels with increased font size and padding, no bold or italics
+    plt.xlabel("Tokens", fontsize=10, labelpad=15)
+    plt.ylabel("Grammaticality Values", fontsize=10, labelpad=15)
+
+    # Rotate the x-axis labels for better readability
+    plt.xticks(rotation=45, ha="right", fontsize=10)
+
+    # Add grid lines for y-axis only with enhanced visibility
+    plt.grid(axis='y', linestyle='--', alpha=0.6)
+
+    # Add a custom background color to the plot
+    plt.gca().set_facecolor('#f7f7f7')
+
+    # Tight layout for avoiding overlap
     plt.tight_layout()
+
+    # Show the plot
     plt.show()
 
 
