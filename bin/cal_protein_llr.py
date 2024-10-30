@@ -5,8 +5,6 @@ import re
 import os
 import csv
 import logging
-from params import amino_acid_dict
-
 
 def flatten(nested_list: List) -> List:
     """
@@ -18,8 +16,7 @@ def flatten(nested_list: List) -> List:
     Returns:
         List: A flattened list.
     """
-    return [item for sublist in nested_list for item in flatten(sublist)] if isinstance(nested_list, list) else [
-        nested_list]
+    return [item for sublist in nested_list for item in flatten(sublist)] if isinstance(nested_list, list) else [nested_list]
 
 
 def extract_mutation_info(df: pd.DataFrame) -> pd.DataFrame:
@@ -32,7 +29,6 @@ def extract_mutation_info(df: pd.DataFrame) -> pd.DataFrame:
     Returns:
         pd.DataFrame: Updated DataFrame with additional columns for mutation details.
     """
-
     def process_row(row):
         # Extract aaMut
         aaMut_match = re.search(r'(p\.\w+\d+\w+)', row['Name'])
@@ -56,7 +52,6 @@ def extract_mutation_info(df: pd.DataFrame) -> pd.DataFrame:
     df = df.apply(process_row, axis=1)
     return df
 
-
 def calculate_llr(row: pd.Series,
                   grammaticality: pd.DataFrame,
                   gene: str) -> float:
@@ -77,18 +72,17 @@ def calculate_llr(row: pd.Series,
 
     # Skip termination mutation
     if pd.isna(mut) or pd.isna(ref):
-        print(f"Skipping termination mutation for Gene={gene}, Site={aasite}.")
+      print(f"Skipping termination mutation for Gene={gene}, Site={aasite}.")
 
     else:
-        # Access grammaticality values using row index and column label
-        wt = grammaticality.loc[aasite - 1, ref]
-        mt = grammaticality.loc[aasite - 1, mut]
+      # Access grammaticality values using row index and column label
+      wt = grammaticality.loc[aasite - 1, ref]
+      mt = grammaticality.loc[aasite - 1, mut]
 
-        # Calculate log-likelihood ratio (LLR)
-        llr = np.log(mt) - np.log(wt)
-        print(f"Calculated LLR for Gene={gene}, Site={aasite}, Ref={ref}, Mut={mut}, LLR={llr}")
-        return llr
-
+      # Calculate log-likelihood ratio (LLR)
+      llr = np.log(mt) - np.log(wt)
+      print(f"Calculated LLR for Gene={gene}, Site={aasite}, Ref={ref}, Mut={mut}: LLR={llr}")
+      return llr
 
 def initialize_output_file(output_path: str):
     """
@@ -116,7 +110,6 @@ def append_batch_to_output_file(output_path: str,
         writer = csv.writer(file)
         writer.writerows(batch_data)
 
-
 def setup_logging():
     """
     Configures the logging settings.
@@ -127,24 +120,6 @@ def setup_logging():
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s'
     )
-
-
-def validate_data(df: pd.DataFrame) -> bool:
-    """
-    Validates that the DataFrame contains the required columns.
-
-    Args:
-        df (pd.DataFrame): DataFrame to validate.
-
-    Returns:
-        bool: True if validation passes, False otherwise.
-    """
-    required_columns = ['Name']
-    for col in required_columns:
-        if col not in df.columns:
-            print(f"Validation Error: Missing required column '{col}'.")
-            return False
-    return True
 
 
 def process_data(data: pd.DataFrame,
@@ -164,10 +139,6 @@ def process_data(data: pd.DataFrame,
     Returns:
         None
     """
-    if not validate_data(data):
-        logging.error(f"Data validation failed for label: {label}")
-        print(f"Data validation failed for '{label}' dataset. Skipping processing.")
-        return
 
     processed_data = extract_mutation_info(data)
 
@@ -241,33 +212,68 @@ def main():
     os.makedirs(output_dir, exist_ok=True)
 
     try:
-        benign_data = pd.read_csv('benign_data.csv')
+        benign_data = pd.read_csv('./data/benign_data.csv')
         logging.info("Loaded benign_data.csv successfully.")
     except Exception as e:
         print(f"Error loading 'benign_data.csv': {e}")
         logging.error(f"Error loading benign_data.csv: {e}")
         benign_data = pd.DataFrame()
 
+
     try:
-        pathogenic_data = pd.read_csv('pathogenic_data.csv')
+        likely_benign_data = pd.read_csv('./data/likely_benign_data.csv')
+        logging.info("Loaded benign_data.csv successfully.")
+    except Exception as e:
+        print(f"Error loading 'benign_data.csv': {e}")
+        logging.error(f"Error loading benign_data.csv: {e}")
+        likely_benign_data = pd.DataFrame()
+
+
+    try:
+        pathogenic_data = pd.read_csv('./data/pathogenic_data.csv')
         logging.info("Loaded pathogenic_data.csv successfully.")
     except Exception as e:
         print(f"Error loading 'pathogenic_data.csv': {e}")
         logging.error(f"Error loading pathogenic_data.csv: {e}")
         pathogenic_data = pd.DataFrame()
 
-    # Process both benign and pathogenic datasets
+
+    try:
+        likely_pathogenic_data = pd.read_csv('./data/likely_pathogenic_data.csv')
+        logging.info("Loaded likely_pathogenic_data.csv successfully.")
+    except Exception as e:
+        print(f"Error loading 'likely_pathogenic_data.csv': {e}")
+        logging.error(f"Error loading likely_pathogenic_data.csv: {e}")
+        likely_pathogenic_data = pd.DataFrame()
+
+
     if not benign_data.empty:
         process_data(benign_data, 'benign', output_dir)
     else:
         print("Benign data is empty. Skipping processing for benign dataset.")
         logging.warning("Benign data is empty. Skipping processing for benign dataset.")
 
+
+    if not likely_benign_data.empty:
+        process_data(likely_benign_data, 'likely_benign', output_dir)
+    else:
+        print("Likely benign data is empty. Skipping processing for likely benign dataset.")
+        logging.warning("Likely benign data is empty. Skipping processing for likely benign dataset.")
+
+
     if not pathogenic_data.empty:
         process_data(pathogenic_data, 'pathogenic', output_dir)
     else:
         print("Pathogenic data is empty. Skipping processing for pathogenic dataset.")
         logging.warning("Pathogenic data is empty. Skipping processing for pathogenic dataset.")
+
+
+    if not likely_pathogenic_data.empty:
+        process_data(likely_pathogenic_data, 'likely_pathogenic', output_dir)
+    else:
+        print("Likely pathogenic data is empty. Skipping processing for likely pathogenic dataset.")
+        logging.warning("Likely pathogenic data is empty. Skipping processing for likely pathogenic dataset.")
+
 
     print("All datasets have been processed.")
     logging.info("Completed processing of mutation data.")

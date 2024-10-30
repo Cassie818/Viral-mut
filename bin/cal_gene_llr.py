@@ -88,9 +88,6 @@ def extract_mutation_info(df: pd.DataFrame) -> pd.DataFrame:
         row['Ref_AA'] = np.nan
         row['Mut_AA'] = np.nan
 
-        # Debug: Print the current row being processed
-        # print(f"Processing row: {name}")
-
         # Extract nucleotide mutation
         ncMut_match = nc_mut_pattern.search(name)
         if ncMut_match:
@@ -150,12 +147,12 @@ def calculate_llr(row: pd.Series,
     Returns:
         float: The LLR value for the given mutation.
     """
-    ncsite = row['ncSite']
-    aasite = row['aaSite']
-    mtsite = int(ncsite) % 3 - 1
+    ncsite = row['ncSite']  # The nucleotide site where the mutation occurs
+    aasite = row['aaSite']  # The amino acid site in the sequence
+    mtsite = (int(ncsite) - 1) % 3
 
-    ref = row['Ref']
-    mut = row['Mut']
+    ref = row['Ref']  # Reference nucleotide
+    mut = row['Mut']  # Mutant nucleotide
 
     # Replace thymine (T) with uracil (U) to represent RNA mutation
     mtnc = mut.replace('T', 'U')
@@ -164,22 +161,28 @@ def calculate_llr(row: pd.Series,
     seq_path = f"./data/Gene/{gene}.fasta"
     sequence = read_fasta_nuc(seq_path)[0][1]  # Extract the sequence part
 
-    # Get reference codon and replace 'T' with 'U' to represent RNA
-    ref_codon = split_into_codons(sequence)[aasite - 1].replace('T', 'U')
+    # Get reference codon by splitting the sequence into codons
+    ref_codon = split_into_codons(sequence)[aasite - 1].replace('T', 'U')  # Ensure 0-based indexing for amino acid site
 
     # Create the mutant codon by modifying the appropriate base
-    if mtsite < 0:
-        # If mtsite is negative, modify the third base of the codon
-        mut_codon = ref_codon[:2] + mtnc + ref_codon[3:]
-    else:
-        # Otherwise, modify the corresponding base position in the codon
-        mut_codon = ref_codon[:mtsite] + mtnc + ref_codon[mtsite + 1:]
+    mut_codon = list(ref_codon)  # Convert to list for mutating a single nucleotide
 
+    if 0 <= mtsite < len(mut_codon):  # Ensure the mutation is within the codon range (0, 1, 2)
+        mut_codon[mtsite] = mtnc  # Modify the nucleotide at the appropriate site
+    else:
+        raise ValueError(f"Invalid mutation site index {mtsite} for codon '{ref_codon}'")
+
+    mut_codon = ''.join(mut_codon)  # Convert back to string
+
+    # Store the reference and mutant codons in the row
     row['Ref_codon'] = ref_codon
     row['Mut_codon'] = mut_codon
 
+    # Check if codons are valid
     if ref_codon not in codon_list or mut_codon not in codon_list:
-        print(f"Warning: Reference codon '{ref_codon}' not found in codon list. Skipping!!!")
+        print(
+            f"Warning: Reference codon '{ref_codon}' or mutant codon '{mut_codon}' not found in codon list. Skipping!!!")
+        return None
     else:
         # Retrieve grammaticality scores for the reference and mutant codons
         wt = grammaticality.iloc[aasite - 1][ref_codon]
@@ -231,24 +234,6 @@ def setup_logging():
     )
 
 
-def validate_data(df: pd.DataFrame) -> bool:
-    """
-    Validates that the DataFrame contains the required columns.
-
-    Args:
-        df (pd.DataFrame): DataFrame to validate.
-
-    Returns:
-        bool: True if validation passes, False otherwise.
-    """
-    required_columns = ['Name']
-    for col in required_columns:
-        if col not in df.columns:
-            print(f"Validation Error: Missing required column '{col}'.")
-            return False
-    return True
-
-
 def process_data(data: pd.DataFrame,
                  label: str,
                  output_dir: str,
@@ -266,10 +251,6 @@ def process_data(data: pd.DataFrame,
     Returns:
         None
     """
-    if not validate_data(data):
-        logging.error(f"Data validation failed for label: {label}")
-        print(f"Data validation failed for '{label}' dataset. Skipping processing.")
-        return
 
     processed_data = extract_mutation_info(data)
 
@@ -343,7 +324,7 @@ def main():
     os.makedirs(output_dir, exist_ok=True)
 
     try:
-        benign_data = pd.read_csv('benign_data.csv')
+        benign_data = pd.read_csv('./data/benign_data.csv')
         logging.info("Loaded benign_data.csv successfully.")
     except Exception as e:
         print(f"Error loading 'benign_data.csv': {e}")
@@ -351,12 +332,28 @@ def main():
         benign_data = pd.DataFrame()
 
     try:
-        pathogenic_data = pd.read_csv('pathogenic_data.csv')
+        likely_benign_data = pd.read_csv('./data/likely_benign_data.csv')
+        logging.info("Loaded benign_data.csv successfully.")
+    except Exception as e:
+        print(f"Error loading 'benign_data.csv': {e}")
+        logging.error(f"Error loading benign_data.csv: {e}")
+        likely_benign_data = pd.DataFrame()
+
+    try:
+        pathogenic_data = pd.read_csv('./data/pathogenic_data.csv')
         logging.info("Loaded pathogenic_data.csv successfully.")
     except Exception as e:
         print(f"Error loading 'pathogenic_data.csv': {e}")
         logging.error(f"Error loading pathogenic_data.csv: {e}")
         pathogenic_data = pd.DataFrame()
+
+    try:
+        likely_pathogenic_data = pd.read_csv('./data/likely_pathogenic_data.csv')
+        logging.info("Loaded likely_pathogenic_data.csv successfully.")
+    except Exception as e:
+        print(f"Error loading 'likely_pathogenic_data.csv': {e}")
+        logging.error(f"Error loading likely_pathogenic_data.csv: {e}")
+        likely_pathogenic_data = pd.DataFrame()
 
     # Process both benign and pathogenic datasets
     if not benign_data.empty:
@@ -365,11 +362,23 @@ def main():
         print("Benign data is empty. Skipping processing for benign dataset.")
         logging.warning("Benign data is empty. Skipping processing for benign dataset.")
 
+    if not likely_benign_data.empty:
+        process_data(likely_benign_data, 'likely_benign', output_dir)
+    else:
+        print("Likely benign data is empty. Skipping processing for likely benign dataset.")
+        logging.warning("Likely benign data is empty. Skipping processing for likely benign dataset.")
+
     if not pathogenic_data.empty:
         process_data(pathogenic_data, 'pathogenic', output_dir)
     else:
         print("Pathogenic data is empty. Skipping processing for pathogenic dataset.")
         logging.warning("Pathogenic data is empty. Skipping processing for pathogenic dataset.")
+
+    if not likely_pathogenic_data.empty:
+        process_data(likely_pathogenic_data, 'likely_pathogenic', output_dir)
+    else:
+        print("Likely pathogenic data is empty. Skipping processing for likely pathogenic dataset.")
+        logging.warning("Likely pathogenic data is empty. Skipping processing for likely pathogenic dataset.")
 
     print("All datasets have been processed.")
     logging.info("Completed processing of mutation data.")

@@ -43,7 +43,7 @@ def plot_distribution(df: pd.DataFrame, site: int, typ: str) -> None:
     # Use a color palette with a gradient for better contrast
     colors = sns.color_palette("mako", n_colors=len(row))
 
-    # Create the barplot
+    # Create the bar plot
     sns.barplot(x=row.index, y=row.values, palette=colors)
 
     # Add a title with increased font size and padding, without bold or italics
