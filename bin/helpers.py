@@ -70,7 +70,10 @@ def plot_distribution(df: pd.DataFrame, site: int, typ: str) -> None:
 
 
 def plot_histogram(pathogenic_list: List,
+                   likely_pathogenic_list: List,
                    benign_list: List,
+                   likely_benign_list: List,
+                   model_name,
                    bins=50):
     """
     Plots a histogram comparing pathogenic and benign ClinVar data with enhanced aesthetics.
@@ -94,6 +97,14 @@ def plot_histogram(pathogenic_list: List,
              edgecolor='black',
              linewidth=1.2)
 
+    plt.hist(likely_pathogenic_list,
+             bins=bins,
+             alpha=0.5,
+             color='#ffbb78',  # a lighter orange color
+             label='ClinVar: Likely Pathogenic',
+             edgecolor='black',
+             linewidth=1.2)
+
     plt.hist(benign_list,
              bins=bins,
              alpha=0.5,
@@ -102,8 +113,16 @@ def plot_histogram(pathogenic_list: List,
              edgecolor='black',
              linewidth=1.2)
 
+    plt.hist(likely_benign_list,
+             bins=bins,
+             alpha=0.5,
+             color='#aec7e8',  # a lighter blue color
+             label='ClinVar: Likely Benign',
+             edgecolor='black',
+             linewidth=1.2)
+
     # Add titles and labels with larger font sizes
-    plt.title('Combined')
+    plt.title(f'{model_name}')
     plt.xlabel('LLR')
     plt.ylabel('Frequency')
     plt.legend(fontsize=12)
