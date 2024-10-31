@@ -10,7 +10,9 @@ def load_data(gene: str):
     return protein_data, gene_data
 
 
-def plot_distribution(df: pd.DataFrame, site: int, typ: str) -> None:
+def plot_distribution(df: pd.DataFrame,
+                      site: int,
+                      typ: str) -> None:
     """
     Plots the distribution of grammaticality values for a given site.
 
@@ -20,17 +22,58 @@ def plot_distribution(df: pd.DataFrame, site: int, typ: str) -> None:
         typ (str): The type of data, either "protein" or "gene".
     """
     if typ == "protein":
-        df = df[['A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L',
-                 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y']]
+        df = df[['K', 'N', 'I', 'M', 'T',
+                 'R', 'S', 'Y', 'L', 'F',
+                 'C', 'W', 'Q', 'H', 'P',
+                 'E', 'D', 'V', 'A', 'G']]
     else:
-        df = df[['AAA', 'AAU', 'AAC', 'AAG', 'AUA', 'AUU', 'AUC', 'AUG',
-                 'ACA', 'ACU', 'ACC', 'ACG', 'AGA', 'AGU', 'AGC', 'AGG',
-                 'UAA', 'UAU', 'UAC', 'UAG', 'UUA', 'UUU', 'UUC', 'UUG',
-                 'UCA', 'UCU', 'UCC', 'UCG', 'UGA', 'UGU', 'UGC', 'UGG',
-                 'GAA', 'GAU', 'CAC', 'CAG', 'CUA', 'CUU', 'CUC', 'CUG',
-                 'CCA', 'CCU', 'CCC', 'CCG', 'CGA', 'CGU', 'CGC', 'CGG',
-                 'GAA', 'GAU', 'GAC', 'GAG', 'GUA', 'GUU', 'GUC', 'GUG',
-                 'GCA', 'GCU', 'GCC', 'GCG', 'GGA', 'GGU', 'GGC', 'GGG']]
+        df = df[['AAA', 'AAG',
+                 'AAU', 'AAC',
+                 'AUA', 'AUU', 'AUC',
+                 'AUG',
+                 'ACA', 'ACC', 'ACG', 'ACU',
+                 'AGA', 'AGG', 'CGA', 'CGC', 'CGG', 'CGU',
+                 'AGU', 'AGC', 'UCA', 'UCC', 'UCG', 'UCU',
+                 'UAU', 'UAC',
+                 'UUA', 'UUG', 'CUA', 'CUC', 'CUG', 'CUU',
+                 'UUU', 'UUC',
+                 'UGU', 'UGC',
+                 'UGG',
+                 'CAA', 'CAG',
+                 'CAU', 'CAC',
+                 'CCA', 'CCC', 'CCG', 'CCU',
+                 'GAA', 'GAG',
+                 'GAU', 'GAC',
+                 'GUA', 'GUG', 'GUC', 'GUU',
+                 'GCA', 'GCG', 'GCU', 'GCC',
+                 'GGA', 'GGG', 'GGU', 'GGC',
+                 'UAA', 'UAG', 'UGA']]
+
+    df = df.rename(columns={'AAA': 'AAA (K)', 'AAG': 'AAG (K)',
+                            'AAU': 'AAU (N)', 'AAC': 'AAC (N)',
+                            'AUA': 'AUA (I)', 'AUU': 'AUU (I)', 'AUC': 'AUC (I)',
+                            'AUG': 'AUG (M)',
+                            'ACA': 'ACA (T)', 'ACC': 'ACC (T)', 'ACG': 'ACG (T)', 'ACU': 'ACU (T)',
+                            'AGA': 'AGA (R)', 'AGG': 'AGG (R)', 'CGA': 'CGA (R)', 'CGC': 'CGC (R)', 'CGG': 'CGG (R)',
+                            'CGU': 'CGU (R)',
+                            'AGU': 'AGU (S)', 'AGC': 'AGC (S)', 'UCA': 'UCA (S)', 'UCC': 'UCC (S)', 'UCG': 'UCG (S)',
+                            'UCU': 'UCU (S)',
+                            'UAU': 'UAU (Y)', 'UAC': 'UAC (Y)',
+                            'UUA': 'UUA (L)', 'UUG': 'UUG (L)', 'CUA': 'CUA (L)', 'CUC': 'CUC (L)', 'CUG': 'CUG (L)',
+                            'CUU': 'CUU (L)',
+                            'UUU': 'UUU (F)', 'UUC': 'UUC (F)',
+                            'UGU': 'UGU (C)', 'UGC': 'UGC (C)',
+                            'UGG': 'UGG (W)',
+                            'CAA': 'CAA (Q)', 'CAG': 'CAG (Q)',
+                            'CAU': 'CAU (H)', 'CAC': 'CAC (H)',
+                            'CCA': 'CCA (P)', 'CCC': 'CCC (P)', 'CCG': 'CCG (P)', 'CCU': 'CCU (P)',
+                            'GAA': 'GAA (E)', 'GAG': 'GAG (E)',
+                            'GAU': 'GAU (D)', 'GAC': 'GAC (D)',
+                            'GUA': 'GUA (V)', 'GUG': 'GUG (V)', 'GUC': 'GUC (V)', 'GUU': 'GUU (V)',
+                            'GCA': 'GCA (A)', 'GCG': 'GCG (A)', 'GCU': 'GCU (A)', 'GCC': 'GCC (A)',
+                            'GGA': 'GGA (G)', 'GGG': 'GGG (G)', 'GGU': 'GGU (G)', 'GGC': 'GGC (G)',
+                            'UAA': 'UAA (Stop)', 'UAG': 'UAG (Stop)', 'UGA': 'UGA (Stop)',
+                            })
 
     row = df.iloc[site - 1]
 
@@ -43,7 +86,7 @@ def plot_distribution(df: pd.DataFrame, site: int, typ: str) -> None:
     # Use a color palette with a gradient for better contrast
     colors = sns.color_palette("mako", n_colors=len(row))
 
-    # Create the bar plot
+    # Create the barplot
     sns.barplot(x=row.index, y=row.values, palette=colors)
 
     # Add a title with increased font size and padding, without bold or italics
