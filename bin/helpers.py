@@ -1,7 +1,8 @@
+import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import pandas as pd
 from typing import List
+import matplotlib.ticker as ticker
 
 
 def load_data(gene: str):
@@ -112,71 +113,114 @@ def plot_distribution(df: pd.DataFrame,
     plt.show()
 
 
-def plot_histogram(pathogenic_list: List,
-                   likely_pathogenic_list: List,
-                   benign_list: List,
-                   likely_benign_list: List,
-                   model_name,
-                   bins=50):
+def plot_histogram(
+        missense_pathogenic: List,
+        missense_likely_pathogenic: List,
+        missense_benign: List,
+        missense_likely_benign: List,
+        nonsense_pathogenic: List,
+        nonsense_likely_pathogenic: List,
+        nonsense_benign: List,
+        nonsense_likely_benign: List,
+        synonymous_pathogenic: List,
+        synonymous_likely_pathogenic: List,
+        synonymous_benign: List,
+        synonymous_likely_benign: List,
+        model_name: str,
+        bins=50):
     """
-    Plots a histogram comparing pathogenic and benign ClinVar data with enhanced aesthetics.
+    Plots separate histograms as individual charts. One chart each for Missense, Nonsense, Synonymous mutations,
+    and one for SNPs Combined.
 
     Parameters:
-    - pathogenic_list: list or array of values representing pathogenic data.
-    - benign_list: list or array of values representing benign data.
+    - Each parameter corresponds to a specific type and pathogenicity level.
+    - model_name: title of the plot.
     - bins: number of bins to use in the histograms (default is 50).
     """
     sns.set(style="whitegrid", context="talk")
 
-    # Create the plot
+    # Define colors for each mutation type
+    colors = {
+        'pathogenic': '#d62728',  # red
+        'likely_pathogenic': '#ff9896',  # light red
+        'benign': '#1f77b4',  # blue
+        'likely_benign': '#aec7e8'  # light blue
+    }
+
+    # Combine data for SNPs
+    snp_pathogenic = missense_pathogenic + nonsense_pathogenic + synonymous_pathogenic
+    snp_likely_pathogenic = missense_likely_pathogenic + nonsense_likely_pathogenic + synonymous_likely_pathogenic
+    snp_benign = missense_benign + nonsense_benign + synonymous_benign
+    snp_likely_benign = missense_likely_benign + nonsense_likely_benign + synonymous_likely_benign
+
+    # Helper function to format the y-axis
+    def format_axis(ax):
+        ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: f'{int(x):,}'))
+        ax.set_xlabel('LLR', fontsize=14)
+        ax.set_ylabel('Frequency', fontsize=14)
+
+    # Plot Missense mutations
     plt.figure(figsize=(8, 6))
-
-    # Plot the histograms for both lists with enhanced transparency and modern colors
-    plt.hist(pathogenic_list,
-             bins=bins,
-             alpha=0.5,
-             color='#ff7f0e',  # a soft orange color
-             label='ClinVar: Pathogenic',
-             edgecolor='black',
-             linewidth=1.2)
-
-    plt.hist(likely_pathogenic_list,
-             bins=bins,
-             alpha=0.5,
-             color='#ffbb78',  # a lighter orange color
-             label='ClinVar: Likely Pathogenic',
-             edgecolor='black',
-             linewidth=1.2)
-
-    plt.hist(benign_list,
-             bins=bins,
-             alpha=0.5,
-             color='#1f77b4',  # a soft blue color
-             label='ClinVar: Benign',
-             edgecolor='black',
-             linewidth=1.2)
-
-    plt.hist(likely_benign_list,
-             bins=bins,
-             alpha=0.5,
-             color='#aec7e8',  # a lighter blue color
-             label='ClinVar: Likely Benign',
-             edgecolor='black',
-             linewidth=1.2)
-
-    # Add titles and labels with larger font sizes
-    plt.title(f'{model_name}')
-    plt.xlabel('LLR')
-    plt.ylabel('Frequency')
-    plt.legend(fontsize=12)
-
-    # Display grid for better readability
-    plt.grid(True, linestyle='--', alpha=0.6)
-
-    # Tight layout for better spacing
+    plt.hist(missense_pathogenic, bins=bins, alpha=0.6, color=colors['pathogenic'],
+             label='Pathogenic', edgecolor='black', linewidth=1)
+    plt.hist(missense_likely_pathogenic, bins=bins, alpha=0.6, color=colors['likely_pathogenic'],
+             label='Likely Pathogenic', edgecolor='black', linewidth=1)
+    plt.hist(missense_benign, bins=bins, alpha=0.6, color=colors['benign'],
+             label='Benign', edgecolor='black', linewidth=1)
+    plt.hist(missense_likely_benign, bins=bins, alpha=0.6, color=colors['likely_benign'],
+             label='Likely Benign', edgecolor='black', linewidth=1)
+    plt.title('Missense mutations', fontsize=14)
+    plt.legend(fontsize=10)
+    format_axis(plt.gca())
     plt.tight_layout()
+    plt.show()
 
-    # Show the plot
+    # Plot Nonsense mutations
+    plt.figure(figsize=(8, 6))
+    plt.hist(nonsense_pathogenic, bins=bins, alpha=0.6, color=colors['pathogenic'], edgecolor='black', linewidth=1,
+             label='Pathogenic')
+    plt.hist(nonsense_likely_pathogenic, bins=bins, alpha=0.6, color=colors['likely_pathogenic'], edgecolor='black',
+             linewidth=1, label='Likely Pathogenic')
+    plt.hist(nonsense_benign, bins=bins, alpha=0.6, color=colors['benign'], edgecolor='black', linewidth=1,
+             label='Benign')
+    plt.hist(nonsense_likely_benign, bins=bins, alpha=0.6, color=colors['likely_benign'], edgecolor='black',
+             linewidth=1, label='Likely Benign')
+    plt.title('Nonsense mutations', fontsize=14)
+    plt.legend(fontsize=10)
+    format_axis(plt.gca())
+    plt.tight_layout()
+    plt.show()
+
+    # Plot Synonymous mutations
+    plt.figure(figsize=(8, 6))
+    plt.hist(synonymous_pathogenic, bins=bins, alpha=0.6, color=colors['pathogenic'],
+             edgecolor='black', linewidth=1, label='Pathogenic')
+    plt.hist(synonymous_likely_pathogenic, bins=bins, alpha=0.6, color=colors['likely_pathogenic'],
+             edgecolor='black', linewidth=1, label='Likely Pathogenic')
+    plt.hist(synonymous_benign, bins=bins, alpha=0.6, color=colors['benign'],
+             edgecolor='black', linewidth=1, label='Benign')
+    plt.hist(synonymous_likely_benign, bins=bins, alpha=0.6, color=colors['likely_benign'],
+             edgecolor='black', linewidth=1, label='Likely Benign')
+    plt.title('Synonymous mutations', fontsize=14)
+    plt.legend(fontsize=10)
+    format_axis(plt.gca())
+    plt.tight_layout()
+    plt.show()
+
+    # Plot SNPs Combined
+    plt.figure(figsize=(8, 6))
+    plt.hist(snp_pathogenic, bins=bins, alpha=0.4, color=colors['pathogenic'],
+             edgecolor='black', linewidth=1,label='Pathogenic')
+    plt.hist(snp_likely_pathogenic, bins=bins, alpha=0.4, color=colors['likely_pathogenic'],
+             edgecolor='black', linewidth=1, label='Likely Pathogenic')
+    plt.hist(snp_benign, bins=bins, alpha=0.4, color=colors['benign'],
+             edgecolor='black', linewidth=1, label='Benign')
+    plt.hist(snp_likely_benign, bins=bins, alpha=0.4, color=colors['likely_benign'],
+             edgecolor='black', linewidth=1, label='Likely Benign')
+    plt.title('SNPs', fontsize=14)
+    plt.legend(fontsize=10)
+    format_axis(plt.gca())
+    plt.tight_layout()
     plt.show()
 
 
