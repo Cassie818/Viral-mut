@@ -14,64 +14,58 @@ def plot_histogram(pathogenic_lists: List[List[float]],
                    model_names: List[str],
                    bins=50,
                    x_range=(-15, 2.5)):
-    """
-    Plots histograms and density plots for multiple models with shared x-axis and fixed range.
-    Highlights the overlapping areas between Pathogenic and Benign density plots.
-    """
-    sns.set(style="whitegrid", context="talk")
-    plt.rcParams['font.family'] = 'sans-serif'
-    plt.rcParams['font.sans-serif'] = ['Arial']
+    palette = {
+        'Pathogenic': '#c1121f',
+        'Likely Pathogenic': '#ff9896',
+        'Benign': '#023e8a',
+        'Likely Benign': '#aec7e8',
+        'Overlap': '#ff9f1c'
+    }
 
-    # Create subplots
+    sns.set(style="white", context="paper")
+    plt.rcParams.update({
+        'font.size': 12,
+        'axes.titlesize': 14,
+        'axes.labelsize': 12,
+        'legend.fontsize': 10
+    })
+
     num_models = len(model_names)
-    fig, axes = plt.subplots(num_models, 1, figsize=(12, 12), sharex=True)
-    if num_models == 1:
-        axes = [axes]
-
-    all_handles = []
-    all_labels = []
+    fig, axes = plt.subplots(num_models, 1, figsize=(9, 3 * num_models), sharex=True)
+    plt.subplots_adjust(hspace=0.4)
+    plt.rcParams['font.family'] = 'sans-serif'
+    plt.rcParams['font.sans-serif'] = ['arial']
 
     for i, ax in enumerate(axes):
-        # Plot histograms on the left y-axis
-        ax.hist(pathogenic_lists[i],
-                bins=bins,
-                range=x_range,
-                alpha=0.6,
-                color='#d62728',
-                label='Pathogenic',
-                edgecolor='white',
-                linewidth=1.5)
-        ax.hist(likely_pathogenic_lists[i],
-                bins=bins,
-                range=x_range,
-                alpha=0.6,
-                color='#ff9896',
-                label='Likely Pathogenic',
-                edgecolor='white',
-                linewidth=1.5)
-        ax.hist(benign_lists[i],
-                bins=bins,
-                range=x_range,
-                alpha=0.6,
-                color='#1f77b4',
-                label='Benign',
-                edgecolor='white',
-                linewidth=1.5)
-        ax.hist(likely_benign_lists[i],
-                bins=bins,
-                range=x_range,
-                alpha=0.6,
-                color='#aec7e8',
-                label='Likely Benign',
-                edgecolor='white',
-                linewidth=1.5)
+        hist_params = {
+            'bins': bins,
+            'range': x_range,
+            'alpha': 0.8,
+            'edgecolor': 'gray',
+            'linewidth': 0.5,
+            'density': False
+        }
 
-        # Create a secondary y-axis for density plots
+        ax.hist(pathogenic_lists[i], **hist_params, color=palette['Pathogenic'])
+        ax.hist(likely_pathogenic_lists[i], **hist_params, color=palette['Likely Pathogenic'])
+        ax.hist(benign_lists[i], **hist_params, color=palette['Benign'])
+        ax.hist(likely_benign_lists[i], **hist_params, color=palette['Likely Benign'])
+        ax.tick_params(axis='y',
+                       labelsize=12,
+                       length=4,
+                       width=1,
+                       color='#404040')
+
         ax_density = ax.twinx()
+        kde_params = {
+            'linewidth': 2,
+            'linestyle': '-',
+            'alpha': 0.8
+        }
 
-        kde_pathogenic = sns.kdeplot(all_pathogenic_lists[i], ax=ax_density, color='#d62728', linewidth=2.5,
+        kde_pathogenic = sns.kdeplot(all_pathogenic_lists[i], ax=ax_density, color='#d62728', linewidth=1.5,
                                      linestyle="--", label='Pathogenic')
-        kde_benign = sns.kdeplot(all_benign_lists[i], ax=ax_density, color='#1f77b4', linewidth=2.5, linestyle="--",
+        kde_benign = sns.kdeplot(all_benign_lists[i], ax=ax_density, color='#1f77b4', linewidth=1.5, linestyle="--",
                                  label='Benign')
 
         kde_pathogenic_x, kde_pathogenic_y = kde_pathogenic.get_lines()[-2].get_data()  # Pathogenic line data
@@ -84,43 +78,57 @@ def plot_histogram(pathogenic_lists: List[List[float]],
         overlap_density = np.minimum(kde_pathogenic_interp, kde_benign_interp)
         overlap_area = np.trapz(overlap_density, common_x)
 
-        total_area_pathogenic = np.trapz(kde_pathogenic_interp, common_x)
-        total_area_benign = np.trapz(kde_benign_interp, common_x)
-
-        ax_density.fill_between(common_x, 0, overlap_density, color='#FFD700', alpha=0.3, label='Overlap')
+        ax_density.fill_between(common_x, 0, overlap_density,
+                                color=palette['Overlap'], alpha=0.2, lw=0)
 
         ax.set_ylim(0, 12000)
-        ax.set_yticks(range(0, 12001, 4000))
-        ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: f"{int(x):,}"))
-        ax.grid(True, linestyle='--', alpha=0.5)
+        ax.yaxis.set_major_formatter(ticker.StrMethodFormatter('{x:,.0f}'))
+        ax.tick_params(axis='x', labelsize=12)
 
-        ax_density.set_ylabel('')
         ax_density.set_ylim(0, 0.4)
-        ax_density.grid(False)
+        ax_density.tick_params(axis='y', labelsize=12, right=False, color='black')
+        ax_density.spines['right'].set_visible(False)
+        ax_density.set_ylabel('')
 
-        # Add title and annotate overlap area
-        ax.set_title(f"{model_names[i]}", fontsize=16, pad=20)
-        ax_density.text(0.95, 0.95,
-                        f"Overlap: {overlap_area:.4f}",
-                        transform=ax_density.transAxes, ha='right', va='top', fontsize=14)
+        for ax in [ax, ax_density]:
+            for spine in ax.spines.values():
+                spine.set_color('#808080')
+                spine.set_linewidth(0.8)
 
-        # Collect legend handles and labels from the first subplot
-        if i == 0:
-            handles, labels = ax.get_legend_handles_labels()
-            handles_density, labels_density = ax_density.get_legend_handles_labels()
-            all_handles.extend(handles + handles_density)
-            all_labels.extend(labels + labels_density)
+        ax.set_title(f"{model_names[i]}", fontweight='semibold', pad=10)
+        ax_density.text(0.99, 0.95,
+                        f"overlap: {overlap_area:.4f}",
+                        transform=ax_density.transAxes,
+                        ha='right', va='top',
+                        fontsize=10)
 
-    fig.text(0.5, 0.05, 'LLR', ha='center', va='center', fontsize=18)
+    handles = [
+        plt.Rectangle((0, 0), 1, 1, fc=palette['Pathogenic'], alpha=0.8),
+        plt.Rectangle((0, 0), 1, 1, fc=palette['Likely Pathogenic'], alpha=0.8),
+        plt.Rectangle((0, 0), 1, 1, fc=palette['Benign'], alpha=0.8),
+        plt.Rectangle((0, 0), 1, 1, fc=palette['Likely Benign'], alpha=0.8),
+        plt.Line2D([], [], color=palette['Pathogenic'], linewidth=2),
+        plt.Line2D([], [], color=palette['Benign'], linewidth=2),
+        plt.Rectangle((0, 0), 1, 1, fc=palette['Overlap'], alpha=0.3)
+    ]
+
+    labels = ['Pathogenic', 'Likely Pathogenic', 'Benign', 'Likely Benign',
+              'Pathogenic density', 'Benign density', 'Overlap']
+
+    # 优化布局
+    fig.supxlabel('LLR', y=0.08, fontsize=12, fontweight='normal')
     axes[-1].set_xlim(x_range)
+    ax.tick_params(axis='x', labelsize=12)
+    fig.align_ylabels()
 
-    plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.95)
+    fig.legend(handles, labels,
+               loc='lower center',
+               ncol=4,
+               bbox_to_anchor=(0.5, -0.01),
+               frameon=True,
+               framealpha=0.9)
 
-    fig.legend(all_handles, all_labels, loc='lower center', ncol=4, fontsize=14, bbox_to_anchor=(0.5, -0.05))
-
-    plt.tight_layout(rect=[0, 0.05, 1, 0.95])
-
-    plt.show()
+    plt.tight_layout(rect=[0, 0.05, 1, 0.99])
 
 
 if __name__ == "__main__":
