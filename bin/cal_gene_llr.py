@@ -1,4 +1,4 @@
-from bin.cal_gene_grammaticality import read_fasta_nuc
+from bin.cal_codon_logits import read_fasta_nuc
 from bin.params import codon_list
 import pandas as pd
 import numpy as np
@@ -62,7 +62,7 @@ def extract_mutation_info(df: pd.DataFrame) -> pd.DataFrame:
     ref_nc_pattern = re.compile(r'c\.\d+([A-Z])>')
     mut_nc_pattern = re.compile(r'>([A-Z])')
     aa_mut_pattern = re.compile(r'(p\.[A-Za-z]{3}\d+[A-Za-z]{3})')
-    aa_site_pattern = re.compile(r'^p\.[A-Za-z]{3}(\d+)[A-Za-z]{3}$')  # Refined pattern
+    aa_site_pattern = re.compile(r'^p\.[A-Za-z]{3}(\d+)[A-Za-z]{3}$')
     ref_aa_pattern = re.compile(r'p\.([A-Za-z]{3})\d+[A-Za-z]{3}')
     mut_aa_pattern = re.compile(r'p\.[A-Za-z]{3}\d+([A-Za-z]{3})')
 

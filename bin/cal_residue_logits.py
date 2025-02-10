@@ -25,10 +25,8 @@ def read_fasta(file_path: str) -> List[Tuple[str, str]]:
         List[Tuple[str, str]]: A list of tuples where each tuple contains a protein name and its corresponding sequence.
     """
     with open(file_path, 'r') as fasta_file:
-        # Group the lines by whether they start with '>', which indicates a header line.
         fasta_entries = groupby(fasta_file, lambda line: line.startswith(">"))
 
-        # Process each group to create the final list of protein names and sequences.
         return [
             (header[1:].strip(), ''.join(seq.strip() for seq in sequence_group).upper())
             for is_header, header_lines in fasta_entries if is_header
@@ -41,7 +39,7 @@ def prepare_grammaticality_data(model_name: str,
                                 seq_path: str,
                                 output_csv_path: str):
     """
-    Loads an ESM model, reads protein sequence, extracts per-residue representations,
+    Load an ESM-2 model, reads protein sequence,
     calculates grammaticality probabilities, and saves to CSV.
 
     Args:
@@ -67,7 +65,6 @@ def prepare_grammaticality_data(model_name: str,
     # Extract per-residue representations
     with torch.no_grad():
         results = model(batch_tokens, repr_layers=[repr_layer], return_contacts=False)
-        # results["logits"]: torch.Tensor -> Shape [batch_size, max_seq_length, alphabet_size]
 
     # Calculate grammaticality probabilities and save to CSV
     with open(output_csv_path, 'w', newline='') as csvfile:
@@ -76,9 +73,10 @@ def prepare_grammaticality_data(model_name: str,
         csv_writer.writerow(header)
 
         for i, tokens_len in enumerate(batch_lens):
-            logits: torch.Tensor = results["logits"]  # Shape [batch_size, seq_length, alphabet_size]
-            grammaticality: np.ndarray = F.softmax(logits[i, 1:tokens_len - 1], dim=-1).cpu().numpy()
+            # Shape [batch_size, seq_length, alphabet_size]
+            logits: torch.Tensor = results["logits"]
             # grammaticality: numpy.ndarray -> Shape [sequence_length, alphabet_size]
+            grammaticality: np.ndarray = F.softmax(logits[i, 1:tokens_len - 1], dim=-1).cpu().numpy()
 
             csv_writer.writerows(grammaticality)
 
@@ -95,6 +93,7 @@ if __name__ == "__main__":
 
         # Load grammaticality data from CSV
         grammaticality: pd.DataFrame = pd.read_csv(output_csv_path)
+        # Save grammaticality data for 20 common amino acids
         grammaticality = grammaticality[['A', 'C', 'D', 'E', 'F',
                                          'G', 'H', 'I', 'K', 'L',
                                          'M', 'N', 'P', 'Q', 'R',
