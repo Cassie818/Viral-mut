@@ -54,12 +54,13 @@ def prepare_grammaticality_data(model_name: str,
     model, alphabet, batch_converter, repr_layer = load_esm_model(model_name)
 
     # Read protein sequence and get batch tokens
-    data: List[Tuple[str, str]] = read_fasta(seq_path)  # List of tuples (protein_name, sequence)
-    batch_labels, batch_strs, batch_tokens = batch_converter(data)
-
+    # List of tuples (protein_name, sequence)
+    data: List[Tuple[str, str]] = read_fasta(seq_path)
     # batch_labels: List[str] -> Protein labels
     # batch_strs: List[str] -> Protein sequences as strings
     # batch_tokens: torch.Tensor -> Tokenized protein sequences, shape [batch_size, max_seq_length]
+    batch_labels, batch_strs, batch_tokens = batch_converter(data)
+
     batch_lens: torch.Tensor = (batch_tokens != alphabet.padding_idx).sum(1)  # Length of each sequence in the batch
 
     # Extract per-residue representations
@@ -69,11 +70,12 @@ def prepare_grammaticality_data(model_name: str,
     # Calculate grammaticality probabilities and save to CSV
     with open(output_csv_path, 'w', newline='') as csvfile:
         csv_writer = csv.writer(csvfile)
-        header: List[str] = [alphabet.get_tok(i) for i in range(len(alphabet))]  # Header for amino acids
+        # Header for amino acids
+        header: List[str] = [alphabet.get_tok(i) for i in range(len(alphabet))]
         csv_writer.writerow(header)
 
         for i, tokens_len in enumerate(batch_lens):
-            # Shape [batch_size, seq_length, alphabet_size]
+            # shape [batch_size, seq_length, alphabet_size]
             logits: torch.Tensor = results["logits"]
             # grammaticality: numpy.ndarray -> Shape [sequence_length, alphabet_size]
             grammaticality: np.ndarray = F.softmax(logits[i, 1:tokens_len - 1], dim=-1).cpu().numpy()

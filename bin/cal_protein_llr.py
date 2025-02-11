@@ -5,6 +5,7 @@ import re
 import os
 import csv
 import logging
+from params import amino_acid_dict
 
 
 def flatten(nested_list: List) -> List:
@@ -26,10 +27,10 @@ def extract_mutation_info(df: pd.DataFrame) -> pd.DataFrame:
     Extracts mutation information including reference and mutant amino acids, and site positions.
 
     Args:
-        df (pd.DataFrame): DataFrame containing mutation data.
+        DataFrame containing mutation data.
 
     Returns:
-        pd.DataFrame: Updated DataFrame with additional columns for mutation details.
+        Updated DataFrame with additional columns for mutation details.
     """
 
     def process_row(row):

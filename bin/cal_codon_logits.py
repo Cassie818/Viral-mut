@@ -5,85 +5,44 @@ from calm import CaLM
 import numpy as np
 import pandas as pd
 import csv
-
-
-def extract_mutation_info(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Extracts nucleotide and amino acid mutation information from the 'Name' column.
-
-    Parameters:
-    - df: pandas DataFrame containing a column 'Name' with mutation information.
-
-    Returns:
-    - df: pandas DataFrame with additional columns for extracted mutation details.
-    """
-    # Extract the nucleotide mutation information
-    df['ncMut'] = df['Name'].str.extract(r'(c\.\d+[A-Z]>[A-Z])')
-
-    # Extract the amino acid mutation information
-    df['aaMut'] = df['Name'].str.extract(r'(p\.\w+\d+\w+)')
-
-    # Extract the numeric part (site) from ncMut and aaMut
-    df['ncSite'] = df['ncMut'].str.extract(r'(\d+)')
-    df['aaSite'] = df['aaMut'].str.extract(r'(\d+)')
-
-    # Extract the reference nucleotide and the mutated nucleotide from ncMut
-    df['Ref'] = df['ncMut'].str.extract(r'([A-Z])>')
-    df['Mut'] = df['ncMut'].str.extract(r'>([A-Z])')
-
-    return df
-
-
-def _split_into_codons(seq: str) -> List[str]:
-    for i in range(0, len(seq), 3):
-        yield seq[i:i + 3]
-
-
-def split_into_codons(seq: str) -> List[str]:
-    """Yield successive 3-letter chunks of a string/sequence."""
-    return list(_split_into_codons(seq))
+import torch
 
 
 class CaLMPluS(CaLM):
 
-    def get_logits(self, sequence: Union[str, 'CodonSequence']) -> np.ndarray:
+    def get_logits(self,
+                   sequence: Union[str, 'CodonSequence']) -> np.ndarray:
         """
         Calculate and return the logits for a given input sequence.
 
-        Parameters:
+        Args:
         - sequence: Union[str, CodonSequence]
             The input sequence for which logits are to be calculated. It can be either
             a string (representing nucleotide bases) or an instance of the CodonSequence class.
 
         Returns:
         - logits: np.ndarray
-            The predicted logits after applying softmax, indicating probabilities across
-            possible classes.
-
-        Raises:
-        - ValueError: If the input sequence is not a string or CodonSequence.
+            The predicted logits after applying softmax, indicating probabilities across possible classes.
         """
-
+        # Check if the input sequence is a string or CodonSequence instance.
         if isinstance(sequence, str):
-            seq: CodonSequence = CodonSequence(sequence)
+            seq: CodonSequence = CodonSequence(sequence)  # Convert string to CodonSequence type.
         elif isinstance(sequence, CodonSequence):
             seq: CodonSequence = sequence
         else:
+            # Raise an error if the input is neither a string nor a CodonSequence.
             raise ValueError('The input sequence must be a string or a CodonSequence instance.')
 
         # Tokenize the codon sequence into a format that the model can understand.
         tokens = self.tokenize(seq)
 
-        # Pass the tokens to the model to generate output.
-        output = self.model(tokens)
+        with torch.no_grad():
 
-        # Extract logits (raw prediction scores) from the model output.
-        logits = output['logits']
+            output = self.model(tokens)
+            logits = output['logits']
+            logits = F.softmax(logits, dim=-1)
 
-        # Apply softmax to convert logits into probabilities
-        logits = F.softmax(logits, dim=-1).detach().numpy()
-
-        return logits
+            return logits.detach().cpu().numpy()
 
 
 def read_fasta_nuc(file_path: str) -> List[Tuple[str, str]]:
@@ -131,7 +90,7 @@ if __name__ == "__main__":
         tok_to_idx = calm.alphabet.tok_to_idx
         codons = [i for i in tok_to_idx]
 
-        csv_fname = f"../Results2/{gene}_CaLM_grammaticality.csv"
+        csv_fname = f"../Results/{gene}_CaLM_grammaticality.csv"
 
         with open(csv_fname, 'w', newline='') as csvfile:
             csv_writer = csv.writer(csvfile)
