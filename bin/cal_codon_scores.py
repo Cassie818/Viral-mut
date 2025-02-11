@@ -52,8 +52,6 @@ def extract_mutation_info(df: pd.DataFrame) -> pd.DataFrame:
         - 'Mut': Mutant nucleotide (single letter)
         - 'aaMut': Amino acid mutation (e.g., 'p.Arg259Pro')
         - 'aaSite': Amino acid mutation position (integer)
-        - 'Ref_AA': Reference amino acid (single letter)
-        - 'Mut_AA': Mutant amino acid (single letter)
     """
 
     # Precompile regular expressions for efficiency
@@ -63,8 +61,6 @@ def extract_mutation_info(df: pd.DataFrame) -> pd.DataFrame:
     mut_nc_pattern = re.compile(r'>([A-Z])')
     aa_mut_pattern = re.compile(r'(p\.[A-Za-z]{3}\d+[A-Za-z]{3})')
     aa_site_pattern = re.compile(r'^p\.[A-Za-z]{3}(\d+)[A-Za-z]{3}$')
-    ref_aa_pattern = re.compile(r'p\.([A-Za-z]{3})\d+[A-Za-z]{3}')
-    mut_aa_pattern = re.compile(r'p\.[A-Za-z]{3}\d+([A-Za-z]{3})')
 
     def process_row(row: pd.Series) -> pd.Series:
         """
@@ -85,8 +81,6 @@ def extract_mutation_info(df: pd.DataFrame) -> pd.DataFrame:
         row['Mut'] = np.nan
         row['aaMut'] = np.nan
         row['aaSite'] = np.nan
-        row['Ref_AA'] = np.nan
-        row['Mut_AA'] = np.nan
 
         # Extract nucleotide mutation
         ncMut_match = nc_mut_pattern.search(name)
@@ -151,24 +145,24 @@ def calculate_llr(row: pd.Series,
     aasite = row['aaSite']  # The amino acid site in the sequence
     mtsite = (int(ncsite) - 1) % 3
 
-    ref = row['Ref']  # Reference nucleotide
-    mut = row['Mut']  # Mutant nucleotide
+    ref = row['Ref']
+    mut = row['Mut']
 
     # Replace thymine (T) with uracil (U) to represent RNA mutation
     mtnc = mut.replace('T', 'U')
 
     # Read the nucleotide sequence from a FASTA file
     seq_path = f"./data/Gene/{gene}.fasta"
-    sequence = read_fasta_nuc(seq_path)[0][1]  # Extract the sequence part
+    sequence = read_fasta_nuc(seq_path)[0][1]
 
     # Get reference codon by splitting the sequence into codons
-    ref_codon = split_into_codons(sequence)[aasite - 1].replace('T', 'U')  # Ensure 0-based indexing for amino acid site
+    ref_codon = split_into_codons(sequence)[aasite - 1].replace('T', 'U')
 
     # Create the mutant codon by modifying the appropriate base
     mut_codon = list(ref_codon)  # Convert to list for mutating a single nucleotide
 
-    if 0 <= mtsite < len(mut_codon):  # Ensure the mutation is within the codon range (0, 1, 2)
-        mut_codon[mtsite] = mtnc  # Modify the nucleotide at the appropriate site
+    if 0 <= mtsite < len(mut_codon):
+        mut_codon[mtsite] = mtnc
     else:
         raise ValueError(f"Invalid mutation site index {mtsite} for codon '{ref_codon}'")
 
@@ -265,7 +259,7 @@ def process_data(data: pd.DataFrame,
     total_skipped = 0
 
     for idx, row in processed_data.iterrows():
-        # Use a regular expression to extract the content inside parentheses
+
         gene_match = re.search(r'\(([^)]+)\)', row['Name'])
         gene = gene_match.group(1) if gene_match else None
 
