@@ -36,7 +36,7 @@ plt.xticks(fontsize=20, rotation=0)
 plt.yticks(fontsize=20, rotation=0)
 
 # Optional: Highlight a specific mutation
-highlight_position = (2, 3)
+highlight_position = (3, 2)
 plt.gca().add_patch(plt.Rectangle((highlight_position[1],
                                    highlight_position[0]),
                                   1,
