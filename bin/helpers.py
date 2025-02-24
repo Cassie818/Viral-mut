@@ -20,7 +20,7 @@ def plot_distribution(df: pd.DataFrame,
     Args:
         df (pd.DataFrame): Dataframe containing grammaticality values.
         site (int): The site (1-based index) for which the distribution is plotted.
-        typ (str): The type of data, either "protein" or "gene".
+        typ (str): The type of Figure, either "protein" or "gene".
     """
     if typ == "protein":
         df = df[['K', 'N', 'I', 'M', 'T',
@@ -147,7 +147,7 @@ def plot_histogram(
         'likely_benign': '#aec7e8'  # light blue
     }
 
-    # Combine data for SNPs
+    # Combine Figure for SNPs
     snp_pathogenic = missense_pathogenic + nonsense_pathogenic + synonymous_pathogenic
     snp_likely_pathogenic = missense_likely_pathogenic + nonsense_likely_pathogenic + synonymous_likely_pathogenic
     snp_benign = missense_benign + nonsense_benign + synonymous_benign

@@ -78,11 +78,11 @@ def read_fasta_nuc(file_path: str) -> List[Tuple[str, str]]:
 
 if __name__ == "__main__":
     calm = CaLMPluS()
-    gene_list = pd.read_csv("../data/gene_info.txt", sep="\t", header=None)[0].tolist()
+    gene_list = pd.read_csv("../Figure/gene_info.txt", sep="\t", header=None)[0].tolist()
 
     for gene in gene_list:
 
-        seq_path = f"../data/Gene/{gene}.fasta"
+        seq_path = f"../Figure/Gene/{gene}.fasta"
         sequence = read_fasta_nuc(seq_path)[0][1]
         # remove the start token and end token
         logits = calm.get_logits(sequence)[:, 1:-1, ]

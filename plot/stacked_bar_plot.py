@@ -44,17 +44,14 @@ def plot_distribution_by_mutation_types(
         sum(x) for x in zip(missense_counts, nonsense_counts, synonymous_counts)
     ]
 
-    # Data preparation
     mutation_types = ['Missense', 'Nonsense', 'Synonymous', 'All']
     effects = ['Pathogenic', 'Likely Pathogenic', 'Benign', 'Likely Benign']
     data = [missense_counts, nonsense_counts, synonymous_counts, combined_counts]
-    colors = ['#c1121f', '#ff9896', '#023e8a', '#aec7e8']  # Colors for each effect
+    colors = ['#c1121f', '#ff9896', '#023e8a', '#aec7e8']
 
-    # Transpose data for stacked bar chart
     data_transposed = np.array(data).T
 
-    # Plotting stacked bar chart
-    x = np.arange(len(mutation_types))  # Position of bars for each mutation type
+    x = np.arange(len(mutation_types))
     bar_width = 0.5
 
     fig, ax = plt.subplots(figsize=(8, 6))
@@ -66,7 +63,6 @@ def plot_distribution_by_mutation_types(
         ax.bar(x, data_transposed[i], bar_width, label=effect, alpha=0.7, color=colors[i], bottom=bottom_values)
         bottom_values += data_transposed[i]
 
-    # Format y-axis to include commas for thousands
     def thousand_separator_formatter(x, _):
         if x == 0:
             return "0"
@@ -79,12 +75,10 @@ def plot_distribution_by_mutation_types(
 
     ax.yaxis.set_major_formatter(FuncFormatter(thousand_separator_formatter))
 
-    # Adding labels, title, and legend
     ax.set_xticks(x)
     ax.set_xticklabels(mutation_types, fontsize=16)
     ax.tick_params(axis='y', labelsize=16)
 
-    # Adjusting the legend
     ax.legend(loc='lower center', bbox_to_anchor=(0.5, -0.3), ncol=2, fontsize=16, frameon=False)
 
     ax.grid(False)

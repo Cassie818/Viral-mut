@@ -20,7 +20,7 @@ def plot_histogram(
     Plots histograms and density curves (KDE) for multiple models.
     Each model includes LLR values for Pathogenic, Likely Pathogenic,
     Benign, and Likely Benign. The overlapping area of the KDE curves
-    between pathogenic-related and benign-related data is also visualized.
+    between pathogenic-related and benign-related Figure is also visualized.
 
     Parameters
     ----------
@@ -47,22 +47,18 @@ def plot_histogram(
         default is (-15, 2.5).
 
     Returns
-    -------
+    ----------
     None
-        The function creates a figure with subplots and shows it,
-        but does not return any object.
     """
 
-    # Color palette
     palette = {
         'Pathogenic': '#c1121f',
         'Likely Pathogenic': '#ff9896',
         'Benign': '#023e8a',
         'Likely Benign': '#aec7e8',
-        'Overlap': '#FFD700'  # Overlap color
+        'Overlap': '#FFD700'
     }
 
-    # Global style settings
     sns.set(style="white", context="paper")
     plt.rcParams.update({
         'font.size': 12,
@@ -74,7 +70,10 @@ def plot_histogram(
     })
 
     num_models = len(model_names)
-    fig, axes = plt.subplots(num_models, 1, figsize=(9, 3 * num_models), sharex=True)
+    fig, axes = plt.subplots(num_models,
+                             1,
+                             figsize=(9, 3 * num_models),
+                             sharex=True)
     plt.subplots_adjust(hspace=0.4)
 
     # Common histogram parameters
@@ -119,7 +118,7 @@ def plot_histogram(
             label='Benign'
         )
 
-        # Extract (x, y) data from the last two lines: pathogenic and benign
+        # Extract (x, y) Figure from the last two lines: pathogenic and benign
         pathogenic_x, pathogenic_y = kde_pathogenic.get_lines()[-2].get_data()
         benign_x, benign_y = kde_benign.get_lines()[-1].get_data()
 
@@ -150,8 +149,6 @@ def plot_histogram(
         # Set y-axis limits for the density plot
         ax_density.set_ylim(0, 0.4)
 
-        # ============================================
-        # Move right ticks inside:
         ax_density.tick_params(
             axis='y',
             which='both',
@@ -162,9 +159,7 @@ def plot_histogram(
             color='black',
             labelsize=12
         )
-        # ============================================
 
-        # Hide top and right, keep left and bottom
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
         ax.spines["left"].set_color('#808080')
@@ -172,16 +167,13 @@ def plot_histogram(
         ax.spines["bottom"].set_color('#808080')
         ax.spines["bottom"].set_linewidth(0.8)
 
-        # -- Customize spines for the density axis --
-        # Keep the right spine, hide top, left, bottom
+
         ax_density.spines["top"].set_visible(False)
         ax_density.spines["left"].set_visible(False)
         ax_density.spines["bottom"].set_visible(False)
         ax_density.spines["right"].set_visible(True)
         ax_density.spines["right"].set_color('#808080')
         ax_density.spines["right"].set_linewidth(0.8)
-
-        # Remove y-label on density axis (since it's a twin axis)
         ax_density.set_ylabel('')
 
         # Title and text box for overlap area

@@ -50,7 +50,7 @@ def prepare_grammaticality_data(model_name: str,
     Returns:
         pd.DataFrame: A DataFrame with the calculated grammaticality for selected amino acids.
     """
-    # Load ESM model and prepare data
+    # Load ESM model and prepare Figure
     model, alphabet, batch_converter, repr_layer = load_esm_model(model_name)
 
     # Read protein sequence and get batch tokens
@@ -84,18 +84,18 @@ def prepare_grammaticality_data(model_name: str,
 
 
 if __name__ == "__main__":
-    Gene_list = pd.read_csv("./data/gene_info.txt", sep="\t", header=None)[0].tolist()
+    Gene_list = pd.read_csv("./Figure/gene_info.txt", sep="\t", header=None)[0].tolist()
     model_name = "esm2_t30_150M_UR50D"
 
     for gene in Gene_list:
-        seq_path = f"./data/Protein/{gene}_protein.fasta"
+        seq_path = f"./Figure/Protein/{gene}_protein.fasta"
         output_csv_path = f"./Results/{gene}_ESM2_grammaticality.csv"
-        # Prepare grammaticality data
+        # Prepare grammaticality Figure
         prepare_grammaticality_data(model_name, seq_path, output_csv_path)
 
-        # Load grammaticality data from CSV
+        # Load grammaticality Figure from CSV
         grammaticality: pd.DataFrame = pd.read_csv(output_csv_path)
-        # Save grammaticality data for 20 common amino acids
+        # Save grammaticality Figure for 20 common amino acids
         grammaticality = grammaticality[['A', 'C', 'D', 'E', 'F',
                                          'G', 'H', 'I', 'K', 'L',
                                          'M', 'N', 'P', 'Q', 'R',

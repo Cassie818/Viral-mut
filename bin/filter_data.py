@@ -1,20 +1,17 @@
 import pandas as pd
 
 
-# Load ClinVar data
 def load_clinvar_data(file_path):
-    """Load ClinVar data from a compressed TSV file."""
+    """Load ClinVar Figure from a compressed TSV file."""
     return pd.read_csv(file_path, sep='\t')
 
 
-# Filtering function
 def filter_clinvar_data(df):
-    """Filter ClinVar data based on specific criteria."""
-    # Filtering criteria
+    """Filter ClinVar Figure based on specific criteria."""
+
     germline_classifications = ['Benign', 'Likely benign', 'Likely pathogenic', 'Pathogenic']
     variation_type = 'single nucleotide variant'
 
-    # Filter data
     filtered_df = df[
         (df['ClinicalSignificance'].isin(germline_classifications)) &  # Filter classification
         (df['Type'].str.contains(variation_type, case=False, na=False)) &  # Single nucleotide variation
@@ -42,7 +39,7 @@ def extract_transcript_gene(filtered_df, output_filtered_file):
     # Filter the dataframe based on the regex pattern in the "Name" column
     filtered_df = filtered_df[filtered_df['Name'].str.contains(pattern, regex=True, na=False)]
     save_filtered_data(filtered_df, output_filtered_file)
-    print(f"Filtered data has been saved to {output_filtered_file}")
+    print(f"Filtered Figure has been saved to {output_filtered_file}")
 
     # Define the regex pattern to extract transcript and gene symbol
     transcript_gene_pattern = r'(NM_\d+\.\d+)\(([A-Za-z0-9]+)\)'
@@ -62,15 +59,14 @@ def extract_transcript_gene(filtered_df, output_filtered_file):
     return df_deduplicated
 
 
-# Save filtered data to a new CSV file
+# Save filtered Figure to a new CSV file
 def save_filtered_data(filtered_df, output_file):
-    """Save the filtered data to a new CSV file."""
+    """Save the filtered Figure to a new CSV file."""
     filtered_df.to_csv(output_file, index=False)
 
 
 if __name__ == "__main__":
-    # Specify the path to the ClinVar data file
-    file_path = "./data/variant_summary.txt"  # Replace with the path to your ClinVar data file
+    file_path = "./Figure/variant_summary.txt"
     output_filtered_file = 'filtered_clinvar_data.csv'
     output_grouped_sorted_file = "clinvar_gene_info.csv"
 
@@ -83,6 +79,6 @@ if __name__ == "__main__":
     df_grouped_sorted = df_deduplicated.sort_values(by=['Gene'], ascending=True)[['Gene', 'Transcript']]
 
     df_grouped_sorted.to_csv(output_grouped_sorted_file, index=False)
-    print(f"Grouped and sorted data has been saved to {output_grouped_sorted_file}")
+    print(f"Grouped and sorted Figure has been saved to {output_grouped_sorted_file}")
 
     print(df_grouped_sorted)
