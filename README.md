@@ -2,7 +2,7 @@
 
 ## Background
 Models for mutation effect prediction in coding sequences rely on sequence-, structure-, or homology-based features. Here, we introduce a novel method that combines a codon language model with a protein language model, providing a dual representation of disease effects. By capturing contextual dependencies at both the genetic and protein level, our approach achieves a 3% increase in ROC-AUC classifying disease effects for 137,350 ClinVar missense variants across 13,791 genes, outperforming two single-sequence-based language models. Obviously the codon language model can uniquely differentiate synonymous from nonsense mutations. Our strategy of using information at complementary biological scales (akin to human multilingual models) extends to protein fitness landscape modeling and evolutionary studies, with potential applications in precision medicine, protein engineering, and genomics.
-<br> <img src="https://github.com/Cassie818/Viral-mut/Figure/fig1.png" width=900> <br>
+<br> <img src="https://github.com/Cassie818/Viral-mut/blob/main/Figure/fig1.png" width=900> <br>
 
 ## Notebooks/Scripts
 - `cal_codon_logits.py`: code for computing logits from CaLM
