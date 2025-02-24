@@ -4,6 +4,7 @@
 Models for mutation effect prediction in coding sequences rely on sequence-, structure-, or homology-based features. Here, we introduce a novel method that combines a codon language model with a protein language model, providing a dual representation of disease effects. By capturing contextual dependencies at both the genetic and protein level, our approach achieves a 3% increase in ROC-AUC classifying disease effects for 137,350 ClinVar missense variants across 13,791 genes, outperforming two single-sequence-based language models. Obviously the codon language model can uniquely differentiate synonymous from nonsense mutations. Our strategy of using information at complementary biological scales (akin to human multilingual models) extends to protein fitness landscape modeling and evolutionary studies, with potential applications in precision medicine, protein engineering, and genomics.
 <br> <img src="https://github.com/Cassie818/Viral-mut/Figures/fig1.png" width=800> <br>
 
+
 ## Notebooks/Scripts
 - `cal_codon_logits.py`: code for computing logits from CaLM
 - `cal_codon_scores.py`: code for computing effect scores at codon-level
@@ -19,14 +20,17 @@ Models for mutation effect prediction in coding sequences rely on sequence-, str
 - `synonymous`: contain all the prediction results for synonymous variants
 - `codon preference.csv`: codon preference results
 
+## Datasets
+All single-point mutations were downloaded from ClinVar (https://ftp.ncbi.nlm.nih.gov/pub/clinvar).
+
 ## Installation
 ### 1. Install CaLM
 ```
-! pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cpu \
-! pip3 install einops \
-! pip3 install rotary_embedding_torch \
-! pip3 install biopython \
-! python setup.py install 
+pip3 install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cpu 
+pip3 install einops
+pip3 install rotary_embedding_torch
+pip3 install biopython
+python setup.py install 
 ```
 ### 2. Install ESM-2
 ```
