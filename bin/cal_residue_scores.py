@@ -11,10 +11,6 @@ from params import amino_acid_dict
 def flatten(nested_list: List) -> List:
     """
     Flattens a nested list into a single-level list.
-
-    Args: nested_list (List): The list to flatten.
-
-    Returns: List: A flattened list.
     """
     return [item for sublist in nested_list for item in flatten(sublist)] if isinstance(nested_list, list) else [
         nested_list]
@@ -138,10 +134,8 @@ def process_data(data: pd.DataFrame,
 
     processed_data = extract_mutation_info(data)
 
-    # Define output file path
     output_path = os.path.join(output_dir, f'{label}_LLR_results.csv')
 
-    # Initialize the output file with headers
     initialize_output_file(output_path)
 
     batch_data = []
@@ -189,7 +183,6 @@ def process_data(data: pd.DataFrame,
                 logging.info(f"Appended batch of {len(batch_data)} rows to {output_path}")
                 batch_data = []
 
-    # Write any remaining Figure in the batch
     if batch_data:
         append_batch_to_output_file(output_path, batch_data)
         logging.info(f"Appended final batch of {len(batch_data)} rows to {output_path}")
@@ -200,15 +193,14 @@ def process_data(data: pd.DataFrame,
 
 
 def main():
-    # Setup logging
+
     setup_logging()
 
-    # Define the directory where output files will be saved
     output_dir = "./LLR"
     os.makedirs(output_dir, exist_ok=True)
 
     try:
-        benign_data = pd.read_csv('./Figure/benign_data.csv')
+        benign_data = pd.read_csv('./data/benign_data.csv')
         logging.info("Loaded benign_data.csv successfully.")
     except Exception as e:
         print(f"Error loading 'benign_data.csv': {e}")
@@ -216,7 +208,7 @@ def main():
         benign_data = pd.DataFrame()
 
     try:
-        likely_benign_data = pd.read_csv('./Figure/likely_benign_data.csv')
+        likely_benign_data = pd.read_csv('./data/likely_benign_data.csv')
         logging.info("Loaded benign_data.csv successfully.")
     except Exception as e:
         print(f"Error loading 'benign_data.csv': {e}")
@@ -224,7 +216,7 @@ def main():
         likely_benign_data = pd.DataFrame()
 
     try:
-        pathogenic_data = pd.read_csv('./Figure/pathogenic_data.csv')
+        pathogenic_data = pd.read_csv('./data/pathogenic_data.csv')
         logging.info("Loaded pathogenic_data.csv successfully.")
     except Exception as e:
         print(f"Error loading 'pathogenic_data.csv': {e}")
@@ -232,7 +224,7 @@ def main():
         pathogenic_data = pd.DataFrame()
 
     try:
-        likely_pathogenic_data = pd.read_csv('./Figure/likely_pathogenic_data.csv')
+        likely_pathogenic_data = pd.read_csv('./data/likely_pathogenic_data.csv')
         logging.info("Loaded likely_pathogenic_data.csv successfully.")
     except Exception as e:
         print(f"Error loading 'likely_pathogenic_data.csv': {e}")
@@ -242,29 +234,29 @@ def main():
     if not benign_data.empty:
         process_data(benign_data, 'benign', output_dir)
     else:
-        print("Benign Figure is empty. Skipping processing for benign dataset.")
-        logging.warning("Benign Figure is empty. Skipping processing for benign dataset.")
+        print("Benign data is empty. Skipping processing for benign dataset.")
+        logging.warning("Benign data is empty. Skipping processing for benign dataset.")
 
     if not likely_benign_data.empty:
         process_data(likely_benign_data, 'likely_benign', output_dir)
     else:
-        print("Likely benign Figure is empty. Skipping processing for likely benign dataset.")
-        logging.warning("Likely benign Figure is empty. Skipping processing for likely benign dataset.")
+        print("Likely benign data is empty. Skipping processing for likely benign dataset.")
+        logging.warning("Likely benign data is empty. Skipping processing for likely benign dataset.")
 
     if not pathogenic_data.empty:
         process_data(pathogenic_data, 'pathogenic', output_dir)
     else:
-        print("Pathogenic Figure is empty. Skipping processing for pathogenic dataset.")
-        logging.warning("Pathogenic Figure is empty. Skipping processing for pathogenic dataset.")
+        print("Pathogenic data is empty. Skipping processing for pathogenic dataset.")
+        logging.warning("Pathogenic data is empty. Skipping processing for pathogenic dataset.")
 
     if not likely_pathogenic_data.empty:
         process_data(likely_pathogenic_data, 'likely_pathogenic', output_dir)
     else:
-        print("Likely pathogenic Figure is empty. Skipping processing for likely pathogenic dataset.")
-        logging.warning("Likely pathogenic Figure is empty. Skipping processing for likely pathogenic dataset.")
+        print("Likely pathogenic data is empty. Skipping processing for likely pathogenic dataset.")
+        logging.warning("Likely pathogenic data is empty. Skipping processing for likely pathogenic dataset.")
 
     print("All datasets have been processed.")
-    logging.info("Completed processing of mutation Figure.")
+    logging.info("Completed processing of mutation data.")
 
 
 if __name__ == "__main__":

@@ -12,12 +12,6 @@ import logging
 def flatten(nested_list: List) -> List:
     """
     Flattens a nested list into a single-level list.
-
-    Args:
-        nested_list (List): The list to flatten.
-
-    Returns:
-        List: A flattened list.
     """
     return [item for sublist in nested_list for item in flatten(sublist)] if isinstance(nested_list, list) else [
         nested_list]
@@ -26,12 +20,6 @@ def flatten(nested_list: List) -> List:
 def split_into_codons(seq: str) -> List[str]:
     """
     Splits the nucleotide sequence into codons (3 bases each).
-
-    Parameters:
-    - seq: str, nucleotide sequence.
-
-    Returns:
-    - List of 3-base strings (codons).
     """
     return [seq[i:i + 3] for i in range(0, len(seq), 3)]
 
@@ -41,7 +29,7 @@ def extract_mutation_info(df: pd.DataFrame) -> pd.DataFrame:
     Extracts mutation information including reference and mutant codons, and site positions.
 
     Args:
-    - df (pd.DataFrame): DataFrame containing a 'Name' column with mutation Figure.
+    - df (pd.DataFrame): DataFrame.
 
     Returns:
     - pd.DataFrame: Updated DataFrame with additional columns for mutation details:
@@ -65,11 +53,9 @@ def extract_mutation_info(df: pd.DataFrame) -> pd.DataFrame:
         """
         Processes a single row to extract mutation details.
 
-        Args:
-        - row (pd.Series): A row from the DataFrame.
+        Args: row (pd.Series): A row from the DataFrame.
 
-        Returns:
-        - pd.Series: The updated row with extracted mutation information.
+        Returns: pd.Series: The updated row with extracted mutation information.
         """
         name = row.get('Name', '')
 
@@ -146,17 +132,17 @@ def calculate_llr(row: pd.Series,
     ref = row['Ref']
     mut = row['Mut']
 
-    # Replace thymine (T) with uracil (U) to represent RNA mutation
+    # Replace thymine (T) with uracil (U)
     mtnc = mut.replace('T', 'U')
 
-    # Read the nucleotide sequence from a FASTA file
+    # Read wild-type cDNA sequence from a FASTA file
     seq_path = f"./data/Gene/{gene}.fasta"
     sequence = read_fasta_nuc(seq_path)[0][1]
 
-    # Get reference codon by splitting the sequence into codons
+    # Get reference codon
     ref_codon = split_into_codons(sequence)[aasite - 1].replace('T', 'U')
 
-    # Create the mutant codon by modifying the appropriate base
+    # Create the mutant codon
     mut_codon = list(ref_codon)  # Convert to list for mutating a single nucleotide
 
     if 0 <= mtsite < len(mut_codon):
@@ -202,7 +188,7 @@ def initialize_output_file(output_path: str):
 def append_batch_to_output_file(output_path: str,
                                 batch_data: List):
     """
-    Appends a batch of Figure to the output CSV file.
+    Appends a batch of data to the output CSV file.
 
     Args:
         output_path (str): Path to the output CSV file.
@@ -237,9 +223,6 @@ def process_data(data: pd.DataFrame,
         label (str): Label to identify the dataset (e.g., 'benign', 'pathogenic').
         output_dir (str): Directory where the output file will be saved.
         batch_size (int): Number of rows to write in each batch.
-
-    Returns:
-        None
     """
 
     processed_data = extract_mutation_info(data)
@@ -305,15 +288,14 @@ def process_data(data: pd.DataFrame,
 
 
 def main():
-    # Setup logging
+
     setup_logging()
 
-    # Define the directory where output files will be saved
     output_dir = "./LLR"
     os.makedirs(output_dir, exist_ok=True)
 
     try:
-        benign_data = pd.read_csv('./Figure/benign_data.csv')
+        benign_data = pd.read_csv('./data/benign_data.csv')
         logging.info("Loaded benign_data.csv successfully.")
     except Exception as e:
         print(f"Error loading 'benign_data.csv': {e}")
@@ -321,7 +303,7 @@ def main():
         benign_data = pd.DataFrame()
 
     try:
-        likely_benign_data = pd.read_csv('./Figure/likely_benign_data.csv')
+        likely_benign_data = pd.read_csv('./data/likely_benign_data.csv')
         logging.info("Loaded benign_data.csv successfully.")
     except Exception as e:
         print(f"Error loading 'benign_data.csv': {e}")
@@ -329,7 +311,7 @@ def main():
         likely_benign_data = pd.DataFrame()
 
     try:
-        pathogenic_data = pd.read_csv('./Figure/pathogenic_data.csv')
+        pathogenic_data = pd.read_csv('./data/pathogenic_data.csv')
         logging.info("Loaded pathogenic_data.csv successfully.")
     except Exception as e:
         print(f"Error loading 'pathogenic_data.csv': {e}")
@@ -337,7 +319,7 @@ def main():
         pathogenic_data = pd.DataFrame()
 
     try:
-        likely_pathogenic_data = pd.read_csv('./Figure/likely_pathogenic_data.csv')
+        likely_pathogenic_data = pd.read_csv('./data/likely_pathogenic_data.csv')
         logging.info("Loaded likely_pathogenic_data.csv successfully.")
     except Exception as e:
         print(f"Error loading 'likely_pathogenic_data.csv': {e}")
@@ -348,29 +330,29 @@ def main():
     if not benign_data.empty:
         process_data(benign_data, 'benign', output_dir)
     else:
-        print("Benign Figure is empty. Skipping processing for benign dataset.")
-        logging.warning("Benign Figure is empty. Skipping processing for benign dataset.")
+        print("Benign data is empty. Skipping processing for benign dataset.")
+        logging.warning("Benign data is empty. Skipping processing for benign dataset.")
 
     if not likely_benign_data.empty:
         process_data(likely_benign_data, 'likely_benign', output_dir)
     else:
-        print("Likely benign Figure is empty. Skipping processing for likely benign dataset.")
-        logging.warning("Likely benign Figure is empty. Skipping processing for likely benign dataset.")
+        print("Likely benign data is empty. Skipping processing for likely benign dataset.")
+        logging.warning("Likely benign data is empty. Skipping processing for likely benign dataset.")
 
     if not pathogenic_data.empty:
         process_data(pathogenic_data, 'pathogenic', output_dir)
     else:
-        print("Pathogenic Figure is empty. Skipping processing for pathogenic dataset.")
-        logging.warning("Pathogenic Figure is empty. Skipping processing for pathogenic dataset.")
+        print("Pathogenic data is empty. Skipping processing for pathogenic dataset.")
+        logging.warning("Pathogenic data is empty. Skipping processing for pathogenic dataset.")
 
     if not likely_pathogenic_data.empty:
         process_data(likely_pathogenic_data, 'likely_pathogenic', output_dir)
     else:
-        print("Likely pathogenic Figure is empty. Skipping processing for likely pathogenic dataset.")
-        logging.warning("Likely pathogenic Figure is empty. Skipping processing for likely pathogenic dataset.")
+        print("Likely pathogenic data is empty. Skipping processing for likely pathogenic dataset.")
+        logging.warning("Likely pathogenic data is empty. Skipping processing for likely pathogenic dataset.")
 
     print("All datasets have been processed.")
-    logging.info("Completed processing of mutation Figure.")
+    logging.info("Completed processing of mutation data.")
 
 
 if __name__ == "__main__":
