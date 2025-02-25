@@ -18,11 +18,9 @@ def read_fasta(file_path: str) -> List[Tuple[str, str]]:
     """
     Reads a FASTA file and returns a list of tuples containing protein names and sequences.
 
-    Args:
-        file_path (str): Path to the FASTA file.
+    Args: file_path (str): Path to the FASTA file.
 
-    Returns:
-        List[Tuple[str, str]]: A list of tuples where each tuple contains a protein name and its corresponding sequence.
+    Returns: List[Tuple[str, str]]: A list of tuples where each tuple contains a protein name and its corresponding sequence.
     """
     with open(file_path, 'r') as fasta_file:
         fasta_entries = groupby(fasta_file, lambda line: line.startswith(">"))
@@ -39,29 +37,25 @@ def prepare_grammaticality_data(model_name: str,
                                 seq_path: str,
                                 output_csv_path: str):
     """
-    Load an ESM-2 model, reads protein sequence,
-    calculates grammaticality probabilities, and saves to CSV.
+    Load an ESM-2 model, reads protein sequence, calculates grammaticality probabilities, and saves to CSV.
 
     Args:
         model_name (str): The name of the ESM model to load.
         seq_path (str): Path to the input protein sequence file in FASTA format.
         output_csv_path (str): Path to the output CSV file to save grammaticality probabilities.
 
-    Returns:
-        pd.DataFrame: A DataFrame with the calculated grammaticality for selected amino acids.
+    Returns: pd.DataFrame: A DataFrame with the calculated grammaticality for selected amino acids.
     """
-    # Load ESM model and prepare Figure
+    # Load ESM model and prepare data
     model, alphabet, batch_converter, repr_layer = load_esm_model(model_name)
 
     # Read protein sequence and get batch tokens
     # List of tuples (protein_name, sequence)
     data: List[Tuple[str, str]] = read_fasta(seq_path)
-    # batch_labels: List[str] -> Protein labels
-    # batch_strs: List[str] -> Protein sequences as strings
-    # batch_tokens: torch.Tensor -> Tokenized protein sequences, shape [batch_size, max_seq_length]
-    batch_labels, batch_strs, batch_tokens = batch_converter(data)
 
-    batch_lens: torch.Tensor = (batch_tokens != alphabet.padding_idx).sum(1)  # Length of each sequence in the batch
+    batch_labels, batch_strs, batch_tokens = batch_converter(data)
+    # Length of each sequence in the batch
+    batch_lens = (batch_tokens != alphabet.padding_idx).sum(1)
 
     # Extract per-residue representations
     with torch.no_grad():
@@ -71,31 +65,31 @@ def prepare_grammaticality_data(model_name: str,
     with open(output_csv_path, 'w', newline='') as csvfile:
         csv_writer = csv.writer(csvfile)
         # Header for amino acids
-        header: List[str] = [alphabet.get_tok(i) for i in range(len(alphabet))]
+        header = [alphabet.get_tok(i) for i in range(len(alphabet))]
         csv_writer.writerow(header)
 
         for i, tokens_len in enumerate(batch_lens):
-            # shape [batch_size, seq_length, alphabet_size]
-            logits: torch.Tensor = results["logits"]
-            # grammaticality: numpy.ndarray -> Shape [sequence_length, alphabet_size]
-            grammaticality: np.ndarray = F.softmax(logits[i, 1:tokens_len - 1], dim=-1).cpu().numpy()
+            # Shape: (batch_size, seq_length, alphabet_size)
+            logits = results["logits"]
+            # Shape: (sequence_length, alphabet_size)
+            grammaticality = F.softmax(logits[i, 1:tokens_len - 1], dim=-1).cpu().numpy()
 
             csv_writer.writerows(grammaticality)
 
 
 if __name__ == "__main__":
-    Gene_list = pd.read_csv("./Figure/gene_info.txt", sep="\t", header=None)[0].tolist()
+    Gene_list = pd.read_csv("./bin/gene_info.txt", sep="\t", header=None)[0].tolist()
     model_name = "esm2_t30_150M_UR50D"
 
     for gene in Gene_list:
-        seq_path = f"./Figure/Protein/{gene}_protein.fasta"
+        seq_path = f"./data/Protein/{gene}_protein.fasta"
         output_csv_path = f"./Results/{gene}_ESM2_grammaticality.csv"
-        # Prepare grammaticality Figure
+        # Prepare grammaticality data
         prepare_grammaticality_data(model_name, seq_path, output_csv_path)
 
-        # Load grammaticality Figure from CSV
+        # Load grammaticality data from CSV
         grammaticality: pd.DataFrame = pd.read_csv(output_csv_path)
-        # Save grammaticality Figure for 20 common amino acids
+        # Save grammaticality data for 20 common amino acids
         grammaticality = grammaticality[['A', 'C', 'D', 'E', 'F',
                                          'G', 'H', 'I', 'K', 'L',
                                          'M', 'N', 'P', 'Q', 'R',

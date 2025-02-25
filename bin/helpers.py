@@ -147,7 +147,6 @@ def plot_histogram(
         'likely_benign': '#aec7e8'  # light blue
     }
 
-    # Combine Figure for SNPs
     snp_pathogenic = missense_pathogenic + nonsense_pathogenic + synonymous_pathogenic
     snp_likely_pathogenic = missense_likely_pathogenic + nonsense_likely_pathogenic + synonymous_likely_pathogenic
     snp_benign = missense_benign + nonsense_benign + synonymous_benign
@@ -223,7 +222,3 @@ def plot_histogram(
     plt.tight_layout()
     plt.show()
 
-
-def flatten(nested_list: List) -> List:
-    return [item for sublist in nested_list for item in flatten(sublist)] if isinstance(nested_list, list) else [
-        nested_list]

@@ -12,11 +12,9 @@ def flatten(nested_list: List) -> List:
     """
     Flattens a nested list into a single-level list.
 
-    Args:
-        nested_list (List): The list to flatten.
+    Args: nested_list (List): The list to flatten.
 
-    Returns:
-        List: A flattened list.
+    Returns: List: A flattened list.
     """
     return [item for sublist in nested_list for item in flatten(sublist)] if isinstance(nested_list, list) else [
         nested_list]
@@ -26,11 +24,9 @@ def extract_mutation_info(df: pd.DataFrame) -> pd.DataFrame:
     """
     Extracts mutation information including reference and mutant amino acids, and site positions.
 
-    Args:
-        DataFrame containing mutation Figure.
+    Args: DataFrame containing mutation data.
 
-    Returns:
-        Updated DataFrame with additional columns for mutation details.
+    Returns: Updated DataFrame with additional columns for mutation details.
     """
 
     def process_row(row):
@@ -52,7 +48,6 @@ def extract_mutation_info(df: pd.DataFrame) -> pd.DataFrame:
 
         return row
 
-    # No print statements here to focus solely on LLR calculations
     df = df.apply(process_row, axis=1)
     return df
 
@@ -68,14 +63,13 @@ def calculate_llr(row: pd.Series,
         grammaticality (pd.DataFrame): DataFrame with grammaticality values for each site and amino acid.
         gene (str): The gene associated with the mutation.
 
-    Returns:
-        float: The LLR value for the given mutation.
+    Returns: Float: The LLR value for the given mutation.
     """
     aasite = row['aaSite']
     ref = row['Ref']
     mut = row['Mut']
 
-    # Skip termination mutation
+    # Skip nonsense mutation
     if pd.isna(mut) or pd.isna(ref):
         print(f"Skipping termination mutation for Gene={gene}, Site={aasite}.")
 
@@ -94,8 +88,7 @@ def initialize_output_file(output_path: str):
     """
     Initializes the output CSV file with headers.
 
-    Args:
-        output_path (str): Path to the output CSV file.
+    Args: output_path (str): Path to the output CSV file.
     """
     headers = ['Label', 'Gene', 'Site', 'Ref', 'Mut', 'LLR']
     with open(output_path, mode='w', newline='') as file:
@@ -106,7 +99,7 @@ def initialize_output_file(output_path: str):
 def append_batch_to_output_file(output_path: str,
                                 batch_data: List):
     """
-    Appends a batch of Figure to the output CSV file.
+    Appends a batch of data to the output CSV file.
 
     Args:
         output_path (str): Path to the output CSV file.
@@ -134,17 +127,13 @@ def process_data(data: pd.DataFrame,
                  output_dir: str,
                  batch_size: int = 100):
     """
-    Processes the mutation Figure by extracting mutation information and calculating LLR.
-    Immediately saves gene site and LLR to an output file in batches.
+    Extracting mutation information and calculating LLR.
 
     Args:
-        data (pd.DataFrame): The input mutation Figure.
+        data (pd.DataFrame): The input mutation data.
         label (str): Label to identify the dataset (e.g., 'benign', 'pathogenic').
         output_dir (str): Directory where the output file will be saved.
         batch_size (int): Number of rows to write in each batch.
-
-    Returns:
-        None
     """
 
     processed_data = extract_mutation_info(data)

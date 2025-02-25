@@ -40,9 +40,6 @@ def configure_plot_style():
     })
 
 
-# --------------------------
-# 绘图模块
-# --------------------------
 def plot_roc_curves(metrics_dict):
     configure_plot_style()
 

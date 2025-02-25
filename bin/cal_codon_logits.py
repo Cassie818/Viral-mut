@@ -16,13 +16,10 @@ class CaLMPluS(CaLM):
         Calculate and return the logits for a given input sequence.
 
         Args:
-        - sequence: Union[str, CodonSequence]
-            The input sequence for which logits are to be calculated. It can be either
-            a string (representing nucleotide bases) or an instance of the CodonSequence class.
+        - sequence: Union[str, CodonSequence]: The input sequence for which logits are to be calculated.
 
         Returns:
-        - logits: np.ndarray
-            The predicted logits after applying softmax, indicating probabilities across possible classes.
+        - logits: np.ndarray: The predicted logits after applying softmax, indicating probabilities across possible classes.
         """
         # Check if the input sequence is a string or CodonSequence instance.
         if isinstance(sequence, str):
@@ -78,11 +75,11 @@ def read_fasta_nuc(file_path: str) -> List[Tuple[str, str]]:
 
 if __name__ == "__main__":
     calm = CaLMPluS()
-    gene_list = pd.read_csv("../Figure/gene_info.txt", sep="\t", header=None)[0].tolist()
+    gene_list = pd.read_csv("../bin/gene_info.txt", sep="\t", header=None)[0].tolist()
 
     for gene in gene_list:
 
-        seq_path = f"../Figure/Gene/{gene}.fasta"
+        seq_path = f"../data/Gene/{gene}.fasta"
         sequence = read_fasta_nuc(seq_path)[0][1]
         # remove the start token and end token
         logits = calm.get_logits(sequence)[:, 1:-1, ]

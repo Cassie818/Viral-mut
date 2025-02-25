@@ -38,10 +38,9 @@ def split_into_codons(seq: str) -> List[str]:
 
 def extract_mutation_info(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Extracts mutation information from the 'Name' column of a DataFrame,
-    including reference and mutant codons, and site positions.
+    Extracts mutation information including reference and mutant codons, and site positions.
 
-    Parameters:
+    Args:
     - df (pd.DataFrame): DataFrame containing a 'Name' column with mutation Figure.
 
     Returns:
@@ -66,7 +65,7 @@ def extract_mutation_info(df: pd.DataFrame) -> pd.DataFrame:
         """
         Processes a single row to extract mutation details.
 
-        Parameters:
+        Args:
         - row (pd.Series): A row from the DataFrame.
 
         Returns:
@@ -138,8 +137,7 @@ def calculate_llr(row: pd.Series,
         grammaticality (pd.DataFrame): DataFrame with grammaticality values for each site and amino acid.
         gene (str): The gene associated with the mutation.
 
-    Returns:
-        float: The LLR value for the given mutation.
+    Returns: float: The LLR value for the given mutation.
     """
     ncsite = row['ncSite']  # The nucleotide site where the mutation occurs
     aasite = row['aaSite']  # The amino acid site in the sequence
@@ -152,7 +150,7 @@ def calculate_llr(row: pd.Series,
     mtnc = mut.replace('T', 'U')
 
     # Read the nucleotide sequence from a FASTA file
-    seq_path = f"./Figure/Gene/{gene}.fasta"
+    seq_path = f"./data/Gene/{gene}.fasta"
     sequence = read_fasta_nuc(seq_path)[0][1]
 
     # Get reference codon by splitting the sequence into codons
@@ -193,8 +191,7 @@ def initialize_output_file(output_path: str):
     """
     Initializes the output CSV file with headers.
 
-    Args:
-        output_path (str): Path to the output CSV file.
+    Args: output_path (str): Path to the output CSV file.
     """
     headers = ['Label', 'Gene', 'Site', 'Ref', 'Mut', 'LLR']
     with open(output_path, mode='w', newline='') as file:
@@ -233,8 +230,7 @@ def process_data(data: pd.DataFrame,
                  output_dir: str,
                  batch_size: int = 100):
     """
-    Processes the mutation Figure by extracting mutation information and calculating LLR.
-    Immediately saves gene site and LLR to an output file in batches.
+    Extracting mutation information and calculating LLR
 
     Args:
         data (pd.DataFrame): The input mutation Figure.
@@ -280,7 +276,7 @@ def process_data(data: pd.DataFrame,
             # Calculate LLR for the current row, passing the gene name
             llr = calculate_llr(row, grammaticality, gene)
 
-            # Prepare Figure to append
+            # Prepare data to append
             output_row = [
                 label,
                 gene,
@@ -299,7 +295,6 @@ def process_data(data: pd.DataFrame,
                 logging.info(f"Appended batch of {len(batch_data)} rows to {output_path}")
                 batch_data = []
 
-    # Write any remaining Figure in the batch
     if batch_data:
         append_batch_to_output_file(output_path, batch_data)
         logging.info(f"Appended final batch of {len(batch_data)} rows to {output_path}")

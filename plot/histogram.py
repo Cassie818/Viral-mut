@@ -46,9 +46,6 @@ def plot_histogram(
         The x-axis range for both histogram and density plots,
         default is (-15, 2.5).
 
-    Returns
-    ----------
-    None
     """
 
     palette = {
