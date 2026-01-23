@@ -2,7 +2,7 @@
 
 ## Background
 Models for mutation effect prediction in coding sequences rely on sequence-, structure-, or homology-based features. Here, we introduce a novel method that combines a codon language model with a protein language model, providing a dual representation of disease effects. By capturing contextual dependencies at both the genetic and protein level, our approach achieves a 3% increase in ROC-AUC classifying disease effects for 137,350 ClinVar missense variants across 13,791 genes, outperforming two single-sequence-based language models. Obviously the codon language model can uniquely differentiate synonymous from nonsense mutations at the genomic level. Our strategy uses information at complementary biological scales (akin to human multilingual models) to enable protein fitness landscape modeling and evolutionary studies, with potential applications in precision medicine, protein engineering, and genomics.
-<br> <img src="https://github.com/Cassie818/Viral-mut/blob/main/Figure/fig1.png" width=850> <br>
+<br> <img src="https://github.com/Cassie818/Viral-mut/blob/main/Figure/fig1.jpeg" width=850> <br>
 
 
 ## Contents
@@ -21,19 +21,19 @@ Models for mutation effect prediction in coding sequences rely on sequence-, str
 - `cal_codon_scores.py`: code for computing effect scores at codon-level
 - `cal_residue_logits.py`: code for computing logits from ESM-2
 - `cal_residue_scores.py`: code for computing effect scores at residue-level
-- `codon_preference.ipynb`: code for identifying codon preferences
+- `figx.ipynb`: code for all relevant analysis involving figx
 - `get_fasta.py`: code for downloading cDNA and protein sequences from NCBI
+- `go.R` code for GO enrichment analysis
 
 
 ## Results
 - `missense`: contain all the prediction results for missense variants
 - `nonsense`: contain all the prediction results for nonsense variants
 - `synonymous`: contain all the prediction results for synonymous variants
-- `codon preference.csv`: codon preference results for each model
 
 
 ## Datasets
-All single-point mutations were downloaded from ClinVar (https://ftp.ncbi.nlm.nih.gov/pub/clinvar). The final benchmark dataset comprised 137,350 missense variants across 13,791 genes, 46,386 nonsense variants across 3,291 genes, and 527,579 synonymous variants across 11,593 genes.
+All single-point mutations were downloaded from ClinVar (https://ftp.ncbi.nlm.nih.gov/pub/clinvar) and ClinMAVE (https://ngdc.cncb.ac.cn/clinmave/).
 
 
 ## Installation
