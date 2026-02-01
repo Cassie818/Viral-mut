@@ -53,7 +53,7 @@ p <- barplot(ego_sim,
     panel.grid.major.x = element_line(color = "grey90"), 
     axis.line.y = element_blank(),
     axis.ticks.y = element_blank(),
-    aspect.ratio = 1.4,
+    aspect.ratio = 1.6,
     plot.title = element_text(
       size = 12,  
       hjust = 0.5,    
