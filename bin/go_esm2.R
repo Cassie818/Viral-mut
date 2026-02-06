@@ -1,7 +1,8 @@
-library(stringr)
-library(clusterProfiler)
-library(org.Hs.eg.db)
+library(gprofiler2)
 library(ggplot2)
+library(stringr)
+library(dplyr) 
+
 
 esm_gene_list <- c('ACAD9', 'CACNA1D', 'CAMTA1', 'CC2D2A', 'CD40LG', 
                    'CFH', 'CPLANE1', 'CYBB', 'DEAF1', 'DICER1', 
@@ -18,36 +19,41 @@ esm_gene_list <- c('ACAD9', 'CACNA1D', 'CAMTA1', 'CC2D2A', 'CD40LG',
                    'TP53', 'TYMP', 'USH2A', 'WAS', 'WDR62', 
                    'WFS1')
 
-gene_entrez <- bitr(esm_gene_list, 
-                    fromType = "SYMBOL", 
-                    toType = "ENTREZID", 
-                    OrgDb = org.Hs.eg.db)
-
-target_genes <- gene_entrez$ENTREZID
-
-ego <- enrichGO(gene          = target_genes,
-                OrgDb         = org.Hs.eg.db,
-                ont           = "BP",     
-                pAdjustMethod = "BH",      
-                pvalueCutoff  = 0.05,      
-                qvalueCutoff  = 0.2,      
-                readable      = TRUE) 
-
-ego_sim <- simplify(ego, 
-                    cutoff = 0.5, 
-                    by = "p.adjust", 
-                    select_fun = min)
+gostres <- gost(query = esm_gene_list, 
+                organism = "hsapiens", 
+                ordered_query = FALSE, 
+                multi_query = FALSE, 
+                significant = TRUE, 
+                exclude_iea = TRUE, 
+                measure_underrepresentation = FALSE, 
+                evcodes = FALSE, 
+                user_threshold = 0.05, 
+                correction_method = "g_SCS", 
+                domain_scope = "annotated", 
+                custom_bg = NULL, 
+                numeric_ns = "", 
+                sources = c("GO:MF")) 
 
 
-p <- barplot(ego_sim, 
-             showCategory = 5) +
+res_df <- gostres$result
+res_df <- res_df %>%
+  filter(term_name != "protein dimerization activity") %>%      
+  filter(term_name != "voltage-gated channel activity") %>%
+  filter(p_value < 0.05) 
+
+res_df <- res_df[order(res_df$p_value), ]
+top_terms <- head(res_df, 10) 
+
+top_terms$term_name <- factor(top_terms$term_name, 
+                              levels = top_terms$term_name[order(top_terms$intersection_size)])
+
+ggplot(top_terms, aes(x = intersection_size, y = term_name, fill = p_value)) +
+  geom_col() +
   scale_y_discrete(labels = function(x) str_wrap(x, width = 40)) +
-  scale_fill_distiller(palette = "BuPu", direction = -1) + 
-  labs(
-    title = "PLM better",
-    x = "Count",
-    fill = "p.adjust"
-  ) +
+  scale_fill_gradient(low = "purple", high = "#E0E0E0", name = "p_value")+
+  labs(title = "PLM better",
+       x = "Count", 
+       y = NULL) +
   theme_classic() +
   theme(
     panel.grid.major.x = element_line(color = "grey90"), 
@@ -59,5 +65,3 @@ p <- barplot(ego_sim,
       hjust = 0.5,    
     ),
   )
-
-print(p)
