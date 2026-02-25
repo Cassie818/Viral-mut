@@ -1,6 +1,7 @@
 library(gprofiler2)
 library(ggplot2)
 library(stringr)
+library(dplyr) 
 
 calm_gene_list <- c('ABCD1', 'AFG3L2', 'AR', 'ARX', 'ATP1A1', 
                     'CACNA1A', 'CACNA1C', 'DHX37', 'DNM1', 'DNMT1', 
@@ -24,35 +25,32 @@ gostres <- gost(query = calm_gene_list,
                 numeric_ns = "", 
                 sources = c("GO:MF"))
 
+if (is.null(gostres)) {
+  stop("None")
+}
 
+res_df <- gostres$result %>%
+  filter(term_name != "DNA-binding transcription activator activity") %>%
+  arrange(p_value) 
 
-res_df <- gostres$result
-res_df <- res_df[res_df$p_value < 0.05, ]
-res_df <- res_df[order(res_df$p_value), ]
-res_df <- res_df %>%
-  filter(term_name != "DNA-binding transcription activator activity") %>% 
-  filter(p_value < 0.05)
+top_terms <- head(res_df, 10)
 
-top_terms <- head(res_df, 10) 
+top_terms <- top_terms[, sapply(top_terms, is.atomic)]
 
-top_terms$term_name <- factor(top_terms$term_name, 
-                              levels = top_terms$term_name[order(top_terms$intersection_size)])
+top_terms$term_name <- reorder(top_terms$term_name, -top_terms$p_value)
 
 ggplot(top_terms, aes(x = intersection_size, y = term_name, fill = p_value)) +
   geom_col() +
   scale_y_discrete(labels = function(x) str_wrap(x, width = 40)) +
-  scale_fill_gradient(low = "purple", high = "#E0E0E0", name = "p_value")+
+  scale_fill_gradient(low = "purple", high = "#E0E0E0", name = "p_value") +
   labs(title = "CLM better",
        x = "Count", 
        y = NULL) +
-  theme_classic()+
+  theme_classic() +
   theme(
     panel.grid.major.x = element_line(color = "grey90"), 
     axis.line.y = element_blank(),
     axis.ticks.y = element_blank(),
     aspect.ratio = 1.6,
-    plot.title = element_text(
-      size = 12,  
-      hjust = 0.5,    
-    ),
+    plot.title = element_text(size = 12, hjust = 0.5)
   )
