@@ -1,7 +1,7 @@
 # Coupling codon and protein constraints decouples drivers of variant pathogenicity
 
 ## Background
-Predicting the functional impact of genetic variants remains a fundamental challenge in genomics. While existing models excel at identifying protein-intrinsic defects, they often overlook the regulatory syntax embedded within coding sequences. Here, we employ single-sequence codon (CaLM) and protein (ESM-2) language models as complementary probes to dissect the drivers of variant pathogenicity. Evaluating the same models on ClinMAVE data across both Deep Mutational Scanning and CRISPR-Based Genome Editing platforms reveals that loss-of-function variants are predominantly governed by residue-level features, whereas gain-of-function variants exhibit a greater, albeit gene-specific, contribution from codon-level constraints. Crucially, a controlled comparison of identical variants within BRCA1 and TP53 provides evidence that codon-level signals are selectively amplified in the endogenous genomic context for dosage-sensitive genes. These results highlight that pathogenicity stems from both the "product" and the "process," and that the experimental context in which variants are assessed can shape which dimension of pathogenicity is visible.
+Predicting the functional impact of genetic variants remains a fundamental challenge in genomics. Existing models focus on protein-intrinsic defects yet overlook regulatory constraints embedded within coding sequences. Here, we couple a codon language model (CaLM) with a protein language model (ESM-2) to dissect the drivers of variant pathogenicity. On ClinVar data, both modalities contribute near-equally to distinguishing pathogenic from benign variants. Evaluation across Deep Mutational Scanning and CRISPR-Based Genome Editing platforms in ClinMAVE reveals that loss-of-function variants are governed primarily by residue-level features, whereas gain-of-function variants show a greater relative contribution from codon-level constraints, albeit in a gene-specific manner. A controlled comparison of identical variants in BRCA1 and TP53 further suggests that codon-level signals are elevated in the endogenous genomic context. Together, these findings indicate that pathogenicity reflects both the "product" and the "process," and that the experimental platform may influence which dimension is observable.
 <br> <img src="https://github.com/Cassie818/Viral-mut/blob/main/Figure/fig1.jpeg" width=850> <br>
 
 
@@ -21,7 +21,7 @@ Predicting the functional impact of genetic variants remains a fundamental chall
 - `cal_codon_scores.py`: code for computing effect scores at codon-level
 - `cal_residue_logits.py`: code for computing logits from ESM-2
 - `cal_residue_scores.py`: code for computing effect scores at residue-level
-- `figx.ipynb`: code for all relevant analysis involving figx
+- `figx.ipynb`: code for all relevant analysis involving Figurex in the manuscript
 - `get_fasta.py`: code for downloading cDNA and protein sequences from NCBI
 - `go.R` code for GO enrichment analysis
 
