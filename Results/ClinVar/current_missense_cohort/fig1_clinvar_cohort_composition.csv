@@ -1,0 +1,31 @@
+panel,dataset,variant_type,class,display_class,n_variants,total_variants
+C,ClinVar,missense,pathogenic,Pathogenic,14798,137350
+C,ClinVar,missense,likely_pathogenic,Likely pathogenic,24482,137350
+C,ClinVar,missense,benign,Benign,30225,137350
+C,ClinVar,missense,likely_benign,Likely benign,67845,137350
+C,ClinVar,nonsense,pathogenic,Pathogenic,37113,46386
+C,ClinVar,nonsense,likely_pathogenic,Likely pathogenic,8834,46386
+C,ClinVar,nonsense,benign,Benign,134,46386
+C,ClinVar,nonsense,likely_benign,Likely benign,305,46386
+C,ClinVar,synonymous,pathogenic,Pathogenic,213,527580
+C,ClinVar,synonymous,likely_pathogenic,Likely pathogenic,219,527580
+C,ClinVar,synonymous,benign,Benign,38903,527580
+C,ClinVar,synonymous,likely_benign,Likely benign,488245,527580
+D,ClinMAVE (DMS),missense,normal,Functionally normal,149222,215952
+D,ClinMAVE (DMS),missense,lof,LoF,65302,215952
+D,ClinMAVE (DMS),missense,gof,GoF,1428,215952
+D,ClinMAVE (DMS),nonsense,normal,Functionally normal,697,11021
+D,ClinMAVE (DMS),nonsense,lof,LoF,10276,11021
+D,ClinMAVE (DMS),nonsense,gof,GoF,48,11021
+D,ClinMAVE (DMS),synonymous,normal,Functionally normal,11983,12666
+D,ClinMAVE (DMS),synonymous,lof,LoF,454,12666
+D,ClinMAVE (DMS),synonymous,gof,GoF,229,12666
+E,ClinMAVE (CBGE),missense,normal,Functionally normal,123998,134707
+E,ClinMAVE (CBGE),missense,lof,LoF,8232,134707
+E,ClinMAVE (CBGE),missense,gof,GoF,2477,134707
+E,ClinMAVE (CBGE),nonsense,normal,Functionally normal,5234,6475
+E,ClinMAVE (CBGE),nonsense,lof,LoF,1198,6475
+E,ClinMAVE (CBGE),nonsense,gof,GoF,43,6475
+E,ClinMAVE (CBGE),synonymous,normal,Functionally normal,32467,45916
+E,ClinMAVE (CBGE),synonymous,lof,LoF,7286,45916
+E,ClinMAVE (CBGE),synonymous,gof,GoF,6163,45916

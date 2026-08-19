@@ -1,0 +1,5 @@
+platform,variant_type,raw_rows,unique_variants,conflicting_variants_removed,retained_variants
+DMS,nonsense,11868,11069,48,11021
+DMS,synonymous,18991,12823,157,12666
+CBGE,nonsense,13068,9662,3187,6475
+CBGE,synonymous,171914,56931,11015,45916

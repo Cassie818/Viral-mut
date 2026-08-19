@@ -1,0 +1,13 @@
+assay,case_class,effect_class,esm1b_650m_rows,calm_rows,merged_rows,input_rows,ambiguous_identifier_rows,duplicate_identifier_rows,analysis_rows,incomplete_score_rows
+DMS,lof,normal,176803.0,176803.0,257023.0,,,,,
+DMS,lof,lof,74038.0,74038.0,95596.0,,,,,
+DMS,lof,,,,,352619.0,22847.0,114784.0,214988.0,47135.0
+DMS,gof,normal,176803.0,176803.0,257023.0,,,,,
+DMS,gof,gof,2237.0,2237.0,2695.0,,,,,
+DMS,gof,,,,,259718.0,2687.0,103270.0,153761.0,31721.0
+CBGE,lof,normal,162056.0,162056.0,162056.0,,,,,
+CBGE,lof,lof,29913.0,29913.0,29913.0,,,,,
+CBGE,lof,,,,,191969.0,42686.0,0.0,149283.0,48128.0
+CBGE,gof,normal,162056.0,162056.0,162056.0,,,,,
+CBGE,gof,gof,29957.0,29957.0,52805.0,,,,,
+CBGE,gof,,,,,214861.0,58045.0,10936.0,145880.0,48118.0

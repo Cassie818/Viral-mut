@@ -1,0 +1,2 @@
+protein_model,space,n_variants,lower_1pct,upper_99pct,clm_leaning_n,plm_leaning_n,clm_enriched_pairs_fdr01,plm_enriched_pairs_fdr01
+ESM-2 650M,aa_aggregated,71436,-9.414704172658526,4.109498465917234,412,1018,0,18
