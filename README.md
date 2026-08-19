@@ -1,4 +1,4 @@
-# Coupling codon and protein constraints decouples drivers of variant pathogenicity
+# Codon-level information complements protein language models for missense variant effect prediction
 
 The project compares codon-level language-model scores from CaLM with residue-level protein language-model scores from ESM-2 and ESM-1b to test whether codon-resolution information contributes to missense-variant interpretation beyond protein-level constraints.
 
@@ -20,19 +20,11 @@ The main analyses use ClinVar and ClinMAVE variant datasets to evaluate:
 ## Repository Structure
 
 ```text
-Figure/             Main and supplementary manuscript figures
-Results/ClinVar/     Current ClinVar cohorts and analysis outputs
-Results/ClinMAVE/    Current ClinMAVE cohorts and analysis outputs
-Results/Revision/    Local intermediate files and model caches (not versioned)
-bin/                Analysis and scoring scripts
-plot/               Figure generation scripts
+Figure/                 Main and supplementary manuscript figures
+Results/Main_Analysis/  Result tables used in the manuscript
+bin/                    Analysis and scoring scripts
+plot/                   Figure generation scripts
 ```
-
-Only `Results/ClinVar/` and `Results/ClinMAVE/` contain the final result tables
-used by the manuscript. `Results/Revision/` is a local working directory for
-large score tables, downloaded model weights, and other reproducible
-intermediates; it is excluded from version control.
-
 ## Key Scripts
 
 ClinVar model and context analyses:
@@ -101,6 +93,7 @@ Language-model resources:
 
 ## References
 
-1. Meier, J. et al. Language models enable zero-shot prediction of the effects of mutations on protein function. *NeurIPS* 34, 29287-29303 (2021).
-2. Outeiral, C. and Deane, C.M. Codon language embeddings provide strong signals for use in protein engineering. *Nature Machine Intelligence* 6, 170-179 (2024).
-3. Lin, Z. et al. Evolutionary-scale prediction of atomic-level protein structure with a language model. *Science* 379, 1123-1130 (2023).
+1. Rives, Alexander, et al. "Biological structure and function emerge from scaling unsupervised learning to 250 million protein sequences." Proceedings of the national academy of sciences 118.15 (2021): e2016239118.
+2. Lin, Zeming, et al. "Evolutionary-scale prediction of atomic-level protein structure with a language model." Science 379.6637 (2023): 1123-1130.
+3. Outeiral, Carlos, and Charlotte M. Deane. "Codon language embeddings provide strong signals for use in protein engineering." Nature Machine Intelligence 6.2 (2024): 170-179. 
+4. Meier, Joshua, et al. "Language models enable zero-shot prediction of the effects of mutations on protein function." Advances in neural information processing systems 34 (2021): 29287-29303.
