@@ -293,13 +293,9 @@ def main() -> None:
     )
     fig.subplots_adjust(left=0.08, right=0.99, top=0.94, bottom=0.24, wspace=0.32)
 
-    for filename in [
-        "fig3_clinmave_genewise_modality.png",
-        "fig3.png",
-    ]:
-        path = FIG_DIR / filename
-        fig.savefig(path, dpi=600, bbox_inches="tight")
-        print(path)
+    path = FIG_DIR / "fig3.png"
+    fig.savefig(path, dpi=600, bbox_inches="tight")
+    print(path)
 
 
 if __name__ == "__main__":

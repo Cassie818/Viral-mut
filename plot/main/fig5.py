@@ -15,9 +15,9 @@ from scipy.stats import fisher_exact
 from statsmodels.stats.multitest import multipletests
 
 
-BASE = Path("Results/Revision/len1022_aa_aggregation")
+BASE = Path("Results/ClinVar/substitution_discordance")
 FIG_DIR = Path("Figure")
-os.environ.setdefault("MPLCONFIGDIR", str(BASE / "mpl_cache"))
+os.environ.setdefault("MPLCONFIGDIR", "/tmp/viral_mut_mpl_cache")
 
 import matplotlib.pyplot as plt
 
@@ -32,8 +32,8 @@ POINT_SLATE = "#8298A1"
 SMOKE = "#EEF0EF"
 GRID = "#F8F8F7"
 MORANDI_DIVERGING = LinearSegmentedColormap.from_list(
-    "clean_teal_coral",
-    ["#6FA8B8", "#CFE8E7", "#FFFFFF", "#F6D8CE", "#DD8F83"],
+    "muted_blue_coral",
+    ["#5E8797", "#B9D0D4", "#FAF9F6", "#EBC2B9", "#CD8178"],
 )
 PATHOGENIC_LABELS = {"pathogenic", "likely_pathogenic"}
 BENIGN_LABELS = {"benign", "likely_benign"}
@@ -75,9 +75,9 @@ def plot_discordance_scatter(ax: plt.Axes, variants: pd.DataFrame) -> None:
     ax.scatter(
         plot_df["diff_codon_650m"],
         plot_df["diff_aa_agg_650m"],
-        s=5.2,
-        color="#9FCFB7",
-        alpha=0.13,
+        s=0.8,
+        color="#E7D46A",
+        alpha=0.026,
         edgecolor="none",
         linewidth=0,
         rasterized=True,
@@ -121,7 +121,7 @@ def plot_degeneracy_forest(ax: plt.Axes, comparison: pd.DataFrame) -> None:
     df["label"] = df["space"].map({"codon": "CaLM codon", "aa_aggregated": "AA-aggregated"})
     df = df.set_index("space").loc[["codon", "aa_aggregated"]].reset_index()
     x = np.arange(len(df))
-    colors = [POINT_BLUE, "#E9AFA7"]
+    colors = ["#A9D5E3", "#E8B8B0"]
     yerr = [
         df["degeneracy_or"] - df["degeneracy_or_95ci_low"],
         df["degeneracy_or_95ci_high"] - df["degeneracy_or"],
@@ -132,7 +132,7 @@ def plot_degeneracy_forest(ax: plt.Axes, comparison: pd.DataFrame) -> None:
         width=0.58,
         color=colors,
         edgecolor=EDGE,
-        linewidth=0.85,
+        linewidth=0.75,
         zorder=2,
     )
     ax.errorbar(
@@ -163,7 +163,7 @@ def plot_degeneracy_forest(ax: plt.Axes, comparison: pd.DataFrame) -> None:
     ax.set_xticklabels(["CaLM\ncodon", "AA-\naggregated"])
     ax.set_ylim(0, 1.08)
     ax.set_xlim(-0.55, len(df) - 0.45)
-    ax.set_ylabel("Odds ratio")
+    ax.set_ylabel("OR")
     add_panel_label(ax, "B")
     format_axes(ax)
 
@@ -250,7 +250,7 @@ def build_esm2_650m_pair_enrichment(variants: pd.DataFrame) -> pd.DataFrame:
     out["upper_99pct"] = upper
     out["clm_leaning_n"] = len(calm)
     out["plm_leaning_n"] = len(plm)
-    out.to_csv(BASE / "fig5_pair_enrichment_esm2_650m_aa_aggregated.csv", index=False)
+    out.to_csv(BASE / "pair_enrichment_esm2_650m_aa_aggregated.csv", index=False)
     summary = pd.DataFrame(
         [
             {
@@ -276,7 +276,7 @@ def build_esm2_650m_pair_enrichment(variants: pd.DataFrame) -> pd.DataFrame:
             }
         ]
     )
-    summary.to_csv(BASE / "fig5_pair_enrichment_esm2_650m_aa_aggregated_summary.csv", index=False)
+    summary.to_csv(BASE / "pair_enrichment_esm2_650m_aa_aggregated_summary.csv", index=False)
     return out
 
 
@@ -305,43 +305,59 @@ def plot_pair_heatmap(
 ) -> None:
     matrix, sig = heatmap_matrix(pair_df, prefix)
     cmap = MORANDI_DIVERGING.copy()
-    cmap.set_bad("#FFFFFF")
     norm = TwoSlopeNorm(vmin=-2.5, vcenter=0.0, vmax=2.5)
-    display = matrix.copy()
-    display[np.abs(display) < 0.30] = 0.0
-    im = ax.imshow(display, cmap=cmap, norm=norm, aspect="equal", interpolation="nearest")
+    rows, cols = np.where(np.isfinite(matrix))
+    values = matrix[rows, cols]
+    im = ax.scatter(
+        cols,
+        rows,
+        c=values,
+        cmap=cmap,
+        norm=norm,
+        s=25,
+        marker="o",
+        edgecolors="none",
+        linewidths=0,
+    )
     ax.set_xticks(np.arange(len(AA_ORDER)))
     ax.set_xticklabels(AA_ORDER, fontsize=7.0)
     ax.set_yticks(np.arange(len(AA_ORDER)))
     ax.set_yticklabels(AA_ORDER, fontsize=7.0)
     ax.set_xlabel("Mutant amino acid")
     ax.set_ylabel("Reference amino acid")
+    ax.set_xlim(-0.6, len(AA_ORDER) - 0.4)
+    ax.set_ylim(len(AA_ORDER) - 0.4, -0.6)
+    ax.set_aspect("equal", adjustable="box")
     ax.tick_params(which="minor", bottom=False, left=False)
     ax.set_facecolor("#FFFFFF")
     for i, j in np.argwhere(sig):
-        rect = plt.Rectangle(
-            (j - 0.5, i - 0.5),
-            1,
-            1,
-            fill=False,
-            edgecolor="#2B2B2B",
-            linewidth=0.95,
-            joinstyle="miter",
+        ax.scatter(
+            j,
+            i,
+            s=38,
+            marker="o",
+            facecolors="none",
+            edgecolors="#303030",
+            linewidths=0.75,
+            zorder=3,
         )
-        ax.add_patch(rect)
     ax.set_title(label, fontsize=8.0, color=DARK, pad=7.0)
     if add_cbar:
         cbar = plt.colorbar(im, ax=ax, cax=cbar_ax, fraction=0.038, pad=0.075)
         cbar.set_label(r"log$_2$ enrichment", fontsize=7.4)
         cbar.ax.tick_params(labelsize=6.8, width=0.8, length=2.5)
     format_axes(ax)
+    for spine in ax.spines.values():
+        spine.set_visible(True)
+        spine.set_color("#9C9C98")
+        spine.set_linewidth(0.75)
     return im
 
 
 def main() -> None:
     FIG_DIR.mkdir(parents=True, exist_ok=True)
-    variants = pd.read_csv(BASE / "len1022_calm_aa_aggregation_variant_scores_with_flags.csv")
-    comparison = pd.read_csv(BASE / "len1022_calm_aa_aggregation_discordance_model_comparison.csv")
+    variants = pd.read_csv(BASE / "variant_discordance_scores.csv.gz")
+    comparison = pd.read_csv(BASE / "discordance_model_comparison.csv")
     aa_pair = build_esm2_650m_pair_enrichment(variants)
 
     plt.rcParams.update(
@@ -353,14 +369,14 @@ def main() -> None:
             "ps.fonttype": 42,
         }
     )
-    fig = plt.figure(figsize=(7.15, 6.55))
+    fig = plt.figure(figsize=(5.90, 5.30))
     gs = fig.add_gridspec(
         2,
         2,
-        width_ratios=[1.0, 1.0],
+        width_ratios=[1.04, 0.96],
         height_ratios=[1.0, 1.0],
-        hspace=0.34,
-        wspace=0.30,
+        hspace=0.29,
+        wspace=0.24,
     )
     ax_a = fig.add_subplot(gs[0, 0])
     ax_b = fig.add_subplot(gs[0, 1])
@@ -375,19 +391,15 @@ def main() -> None:
     add_panel_label(ax_d, "D")
     im_d = plot_pair_heatmap(ax_d, aa_pair, "plm", "PLM-leaning discordance", add_cbar=False)
 
-    fig.subplots_adjust(left=0.08, right=0.93, top=0.965, bottom=0.08)
+    fig.subplots_adjust(left=0.085, right=0.925, top=0.96, bottom=0.085)
     d_pos = ax_d.get_position()
-    cax_d = fig.add_axes([d_pos.x1 + 0.008, d_pos.y0, 0.012, d_pos.height])
+    cax_d = fig.add_axes([d_pos.x1 + 0.006, d_pos.y0, 0.011, d_pos.height])
     cbar = fig.colorbar(im_d, cax=cax_d)
     cbar.set_label(r"log$_2$ enrichment", fontsize=7.4)
     cbar.ax.tick_params(labelsize=6.8, width=0.8, length=2.5)
-    for filename in [
-        "fig5.png",
-        "fig5_codon_resolution_discordance.png",
-    ]:
-        path = FIG_DIR / filename
-        fig.savefig(path, dpi=600, bbox_inches="tight")
-        print(path)
+    path = FIG_DIR / "fig5.png"
+    fig.savefig(path, dpi=600, bbox_inches="tight")
+    print(path)
 
 
 if __name__ == "__main__":

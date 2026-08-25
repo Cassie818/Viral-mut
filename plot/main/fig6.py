@@ -458,7 +458,7 @@ def main() -> None:
         "esm2_calm_weight",
         "esm2_cross_modal_gain",
         "Optimized CaLM weight",
-        "Cross-modal gain",
+        r"$\Delta\mathrm{AUROC}_{+\mathrm{CaLM}}$",
         ROSE,
     )
     scatter_with_fit(
@@ -466,8 +466,8 @@ def main() -> None:
         df,
         "esm2_independent_calm_signal",
         "esm2_cross_modal_gain",
-        "CaLM standalone - ESM-2 (650M)",
-        "Cross-modal gain",
+        r"$\Delta\mathrm{AUROC}_{\mathrm{single}}$",
+        r"$\Delta\mathrm{AUROC}_{+\mathrm{CaLM}}$",
         ROSE,
         stat_mode="spearman",
         show_lowess=True,
@@ -494,10 +494,9 @@ def main() -> None:
         df,
         "esm2_cross_modal_gain",
         "Top genes by cross-modal gain",
-        "Cross-modal gain",
+        r"$\Delta\mathrm{AUROC}_{+\mathrm{CaLM}}$",
         "{:.3f}",
         n=10,
-        xlim=(0.0, 0.255),
         bar_left=0.0,
         show_n=False,
     )
@@ -518,9 +517,9 @@ def main() -> None:
     )
     fig.subplots_adjust(left=0.095, right=0.985, top=0.965, bottom=0.075)
 
-    for name in ["fig6", "fig6_gene_level_codon_contribution", "fig_gene_level_codon_contribution"]:
-        fig.savefig(FIG_DIR / f"{name}.png", dpi=600, bbox_inches="tight")
-        print(FIG_DIR / f"{name}.png")
+    output_path = FIG_DIR / "fig6.png"
+    fig.savefig(output_path, dpi=600, bbox_inches="tight")
+    print(output_path)
 
 
 if __name__ == "__main__":

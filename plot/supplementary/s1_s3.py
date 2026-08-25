@@ -273,7 +273,7 @@ def plot_fold_delta_distribution(gene_folds: pd.DataFrame) -> None:
     ax.set_xlabel("Fold-level ΔAUROC")
     format_ax(ax)
     fig.tight_layout()
-    fig.savefig(FIG_DIR / "figS1_model_control_fold_delta_distribution.png", dpi=600, bbox_inches="tight")
+    fig.savefig(FIG_DIR / "figS1.png", dpi=600, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -342,7 +342,7 @@ def plot_cv_comparison(gene_folds: pd.DataFrame, variant_folds: pd.DataFrame) ->
     )
     format_ax(ax)
     fig.subplots_adjust(bottom=0.205, top=0.98, left=0.075, right=0.995)
-    fig.savefig(FIG_DIR / "figS2_gene_vs_variantwise_cv.png", dpi=600, bbox_inches="tight")
+    fig.savefig(FIG_DIR / "figS2.png", dpi=600, bbox_inches="tight")
     plt.close(fig)
     return out
 
@@ -390,7 +390,7 @@ def plot_weight_distribution(gene_folds: pd.DataFrame) -> None:
     axes[0, 0].set_ylabel("Optimized weight")
     axes[1, 0].set_ylabel("Optimized weight")
     fig.tight_layout(w_pad=0.65, h_pad=0.85)
-    fig.savefig(FIG_DIR / "figS3_model_control_fold_weight_distribution.png", dpi=600, bbox_inches="tight")
+    fig.savefig(FIG_DIR / "figS3.png", dpi=600, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -419,9 +419,9 @@ def main() -> None:
     print(OUT_DIR / "supp_table_model_control_all_pairwise_tests.csv")
     print(OUT_DIR / "supp_table_model_control_gene_vs_variantwise_cv.csv")
     print(OUT_DIR / "supp_table_model_control_fold_weight_summary.csv")
-    print(FIG_DIR / "figS1_model_control_fold_delta_distribution.png")
-    print(FIG_DIR / "figS2_gene_vs_variantwise_cv.png")
-    print(FIG_DIR / "figS3_model_control_fold_weight_distribution.png")
+    print(FIG_DIR / "figS1.png")
+    print(FIG_DIR / "figS2.png")
+    print(FIG_DIR / "figS3.png")
     print(cv_comparison[["model", "gene_wise_mean_auc", "variant_wise_mean_auc", "variant_minus_gene_mean_auc"]].to_string(index=False))
 
 

@@ -460,11 +460,9 @@ def main() -> None:
 
     fig.subplots_adjust(left=0.062, right=0.985, top=0.94, bottom=0.08, hspace=0.56, wspace=0.25)
 
-    png = FIG_DIR / "fig2_codon_nonredundant_model_context.png"
-    fig.savefig(png, dpi=600, bbox_inches="tight")
-    fig.savefig(FIG_DIR / "fig2.png", dpi=600, bbox_inches="tight")
-    print(png)
-    print(FIG_DIR / "fig2.png")
+    path = FIG_DIR / "fig2.png"
+    fig.savefig(path, dpi=600, bbox_inches="tight")
+    print(path)
 
 
 if __name__ == "__main__":

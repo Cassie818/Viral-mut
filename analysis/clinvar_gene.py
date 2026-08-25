@@ -12,7 +12,7 @@ import statsmodels.api as sm
 
 
 IN_DIR = Path("Results/Revision/len1022_core_clinvar")
-OUT_DIR = IN_DIR / "gene_level_dosage"
+OUT_DIR = Path("Results/ClinVar/gene_level")
 
 
 def fit_regression(df: pd.DataFrame, x_col: str, y_col: str, label: str, weighted: bool) -> dict[str, object]:
@@ -80,8 +80,11 @@ def fit_spearman_and_top5_sensitivity(df: pd.DataFrame, x_col: str, y_col: str, 
 def add_rankings(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     out["esm2_calm_weight"] = out["ESM-2 650M + CaLM weight_second"]
-    out["esm2_cross_modal_gain"] = out["650MCaLM_minus_150M650M"]
-    out["esm2_gain_over_protein"] = out["650MCaLM_minus_650M"]
+    # Primary gain: improvement from adding CaLM to a fixed ESM-2 (650M) baseline.
+    out["esm2_cross_modal_gain"] = out["650MCaLM_minus_650M"]
+    # Sensitivity control: cross-modal ensemble relative to a within-protein ensemble.
+    out["esm2_cross_modal_advantage"] = out["650MCaLM_minus_150M650M"]
+    out["esm2_gain_over_protein"] = out["esm2_cross_modal_gain"]
     out["esm2_independent_calm_signal"] = out["CaLM AUROC"] - out["ESM-2 650M AUROC"]
 
     out["esm1b_calm_weight"] = out["ESM-1b 650M + CaLM weight_second"]
@@ -112,12 +115,80 @@ def write_gene_list(df: pd.DataFrame, mask_col: str, metric_col: str, filename: 
         "CaLM AUROC",
         "esm2_calm_weight",
         "esm2_cross_modal_gain",
+        "esm2_cross_modal_advantage",
         "esm2_independent_calm_signal",
         "esm1b_calm_weight",
         "esm1b_gain_over_protein",
         "esm1b_independent_calm_signal",
     ]
     df.loc[df[mask_col]].sort_values(metric_col, ascending=False)[cols].to_csv(OUT_DIR / filename, index=False)
+
+
+def write_ranked_set_tables(df: pd.DataFrame) -> None:
+    """Write auditable top-decile and top-20 overlap tables."""
+    out = df.copy()
+    out["top_weight_both_plm_backgrounds"] = (
+        out["esm2_top_codon_weight_decile"] & out["esm1b_top_codon_weight_decile"]
+    )
+    out["top_weight_and_gain_within_esm2"] = (
+        out["esm2_top_codon_weight_decile"] & out["esm2_top_cross_modal_gain_decile"]
+    )
+
+    decile_columns = [
+        "gene",
+        "n",
+        "n_pathogenic",
+        "n_benign",
+        "esm2_calm_weight",
+        "esm2_codon_rank",
+        "esm2_top_codon_weight_decile",
+        "esm2_cross_modal_gain",
+        "esm2_gain_rank",
+        "esm2_top_cross_modal_gain_decile",
+        "esm1b_calm_weight",
+        "esm1b_codon_rank",
+        "esm1b_top_codon_weight_decile",
+        "esm1b_gain_over_protein",
+        "esm1b_gain_rank",
+        "esm1b_top_gain_decile",
+        "top_weight_both_plm_backgrounds",
+        "top_weight_and_gain_within_esm2",
+    ]
+    decile_mask = out[
+        [
+            "esm2_top_codon_weight_decile",
+            "esm2_top_cross_modal_gain_decile",
+            "esm1b_top_codon_weight_decile",
+            "esm1b_top_gain_decile",
+        ]
+    ].any(axis=1)
+    decile_table = out.loc[decile_mask, decile_columns].sort_values(
+        ["top_weight_both_plm_backgrounds", "top_weight_and_gain_within_esm2", "esm2_codon_rank"],
+        ascending=[False, False, True],
+    )
+    decile_table.to_csv(OUT_DIR / "top_decile_genes_across_plm_backgrounds.csv", index=False)
+    decile_table.to_excel(OUT_DIR / "top_decile_genes_across_plm_backgrounds.xlsx", index=False)
+
+    top20_mask = (out["esm2_codon_rank"] <= 20) & (out["esm2_gain_rank"] <= 20)
+    top20_columns = [
+        "gene",
+        "esm2_codon_rank",
+        "esm2_calm_weight",
+        "n",
+        "n_pathogenic",
+        "n_benign",
+        "esm2_gain_rank",
+        "esm2_cross_modal_gain",
+    ]
+    top20 = out.loc[top20_mask, top20_columns].rename(
+        columns={
+            "esm2_codon_rank": "rank_by_calm_weight",
+            "esm2_gain_rank": "rank_by_cross_modal_gain",
+        }
+    )
+    top20.sort_values("rank_by_calm_weight").to_csv(
+        OUT_DIR / "top20_calm_weight_cross_modal_gain_intersection.csv", index=False
+    )
 
 
 def main() -> None:
@@ -142,6 +213,34 @@ def main() -> None:
                 "esm2_independent_calm_signal",
                 "esm2_cross_modal_gain",
                 "weighted_esm2_independent_calm_signal_predicts_cross_modal_gain",
+                True,
+            ),
+            fit_regression(
+                ranked,
+                "esm2_calm_weight",
+                "esm2_cross_modal_advantage",
+                "esm2_weight_predicts_cross_modal_advantage",
+                False,
+            ),
+            fit_regression(
+                ranked,
+                "esm2_calm_weight",
+                "esm2_cross_modal_advantage",
+                "weighted_esm2_weight_predicts_cross_modal_advantage",
+                True,
+            ),
+            fit_regression(
+                ranked,
+                "esm2_independent_calm_signal",
+                "esm2_cross_modal_advantage",
+                "esm2_independent_calm_signal_predicts_cross_modal_advantage",
+                False,
+            ),
+            fit_regression(
+                ranked,
+                "esm2_independent_calm_signal",
+                "esm2_cross_modal_advantage",
+                "weighted_esm2_independent_calm_signal_predicts_cross_modal_advantage",
                 True,
             ),
             fit_regression(ranked, "esm1b_calm_weight", "esm1b_gain_over_protein", "esm1b_weight_predicts_gain_over_esm1b", False),
@@ -192,6 +291,7 @@ def main() -> None:
     write_gene_list(ranked, "esm2_top_cross_modal_gain_decile", "esm2_cross_modal_gain", "esm2_top_cross_modal_gain_decile_genes.csv")
     write_gene_list(ranked, "esm1b_top_codon_weight_decile", "esm1b_calm_weight", "esm1b_top_codon_weight_decile_genes.csv")
     write_gene_list(ranked, "esm1b_top_gain_decile", "esm1b_gain_over_protein", "esm1b_top_gain_decile_genes.csv")
+    write_ranked_set_tables(ranked)
 
     summary = pd.DataFrame(
         [
@@ -203,6 +303,8 @@ def main() -> None:
                 "median_esm2_calm_weight": float(ranked["esm2_calm_weight"].median()),
                 "mean_esm2_cross_modal_gain": float(ranked["esm2_cross_modal_gain"].mean()),
                 "median_esm2_cross_modal_gain": float(ranked["esm2_cross_modal_gain"].median()),
+                "mean_esm2_cross_modal_advantage": float(ranked["esm2_cross_modal_advantage"].mean()),
+                "median_esm2_cross_modal_advantage": float(ranked["esm2_cross_modal_advantage"].median()),
                 "mean_esm1b_calm_weight": float(ranked["esm1b_calm_weight"].mean()),
                 "median_esm1b_calm_weight": float(ranked["esm1b_calm_weight"].median()),
                 "mean_esm1b_gain_over_protein": float(ranked["esm1b_gain_over_protein"].mean()),

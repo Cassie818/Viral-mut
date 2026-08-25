@@ -21,21 +21,21 @@ OUTS = [Path("Figure/fig7.png")]
 plt.rcParams.update(
     {
         "font.family": "Arial",
-        "font.size": 10,
-        "axes.labelsize": 11,
-        "xtick.labelsize": 9,
-        "ytick.labelsize": 9,
-        "axes.linewidth": 1.2,
+        "font.size": 9,
+        "axes.labelsize": 9.5,
+        "xtick.labelsize": 8.2,
+        "ytick.labelsize": 8.2,
+        "axes.linewidth": 0.9,
         "pdf.fonttype": 42,
         "ps.fonttype": 42,
     }
 )
 
 COLORS = {
-    "150": "#A9CBBE",
-    "650": "#E6C99F",
-    "pos": "#92B9AE",
-    "neg": "#D8B08C",
+    "150": "#9CCDDD",
+    "650": "#E7D27A",
+    "pos": "#79B3A6",
+    "neg": "#D99C91",
     "neutral": "#8E9390",
     "line": "#C9CECB",
     "grid": "#ECEBE7",
@@ -59,9 +59,9 @@ def style_ax(ax: plt.Axes) -> None:
     ax.spines["right"].set_visible(False)
     for spine in ["left", "bottom"]:
         ax.spines[spine].set_color("#8F918E")
-        ax.spines[spine].set_linewidth(1.4)
+        ax.spines[spine].set_linewidth(0.9)
     ax.grid(False)
-    ax.tick_params(width=1.2, colors=COLORS["text"], length=4)
+    ax.tick_params(width=0.85, colors=COLORS["text"], length=3)
 
 
 def add_panel_label(ax: plt.Axes, label: str) -> None:
@@ -72,7 +72,7 @@ def add_panel_label(ax: plt.Axes, label: str) -> None:
         y,
         label,
         transform=ax.transAxes,
-        fontsize=14,
+        fontsize=11.5,
         fontweight="bold",
         ha="left",
         va="top",
@@ -88,17 +88,15 @@ def paired_panel(ax: plt.Axes, df: pd.DataFrame, model: str, color: str) -> None
         cbge = row["mean_calm_weight_CBGE"]
         delta = row["delta_CBGE_minus_DMS"]
         line_color = COLORS["pos"] if delta >= 0 else COLORS["neg"]
-        alpha = 0.48 if row["n_variants"] < 50 else 0.72
-        ax.plot(x, [dms, cbge], color=line_color, linewidth=1.1, alpha=alpha, zorder=1)
-        size = 18 + min(row["n_variants"], 250) * 0.16
-        ax.scatter(0, dms, s=size, facecolor=color, edgecolor=line_color, linewidth=1.0, zorder=2)
-        ax.scatter(1, cbge, s=size, facecolor=color, edgecolor=line_color, linewidth=1.0, zorder=3)
+        ax.plot(x, [dms, cbge], color=line_color, linewidth=0.8, alpha=0.52, zorder=1)
+        ax.scatter(0, dms, s=24, facecolor=line_color, edgecolor="white", linewidth=0.45, alpha=0.9, zorder=2)
+        ax.scatter(1, cbge, s=24, facecolor=line_color, edgecolor="white", linewidth=0.45, alpha=0.9, zorder=3)
 
     ax.set_xlim(-0.28, 1.28)
     ax.set_ylim(-0.03, 1.03)
     ax.set_xticks([0, 1], ["DMS", "CBGE"])
-    ax.set_ylabel("Optimized CaLM weight")
-    ax.set_title(model, fontsize=10, pad=7)
+    ax.set_ylabel("Optimised CaLM weight")
+    ax.set_title(model, fontsize=9.2, pad=5)
     style_ax(ax)
 
 
@@ -126,21 +124,20 @@ def gene_delta_panel(ax: plt.Axes, df: pd.DataFrame) -> None:
         if np.isfinite(row.get("mean_delta_650M", np.nan)):
             values.append(row["mean_delta_650M"])
         if len(values) == 2:
-            ax.plot(values, [idx, idx], color=COLORS["line"], linewidth=1.4, zorder=2)
+            ax.plot(values, [idx, idx], color=COLORS["line"], linewidth=1.0, zorder=2)
 
     for model_short, color, offset in [("150M", COLORS["150"], -0.13), ("650M", COLORS["650"], 0.13)]:
         col = f"mean_delta_{model_short}"
         ncol = f"n_pairs_{model_short}"
         subset = gene[np.isfinite(gene[col])].copy()
-        sizes = 38 + subset[ncol].fillna(1).astype(float) * 12
         ax.scatter(
             subset[col],
             subset.index + offset,
-            s=sizes,
+            s=34,
             facecolor=color,
             edgecolor="#7E8784",
-            linewidth=0.8,
-            alpha=0.9,
+            linewidth=0.7,
+            alpha=0.95,
             zorder=3,
             label=f"ESM-2 ({model_short})",
         )
@@ -150,7 +147,7 @@ def gene_delta_panel(ax: plt.Axes, df: pd.DataFrame) -> None:
     ax.set_ylim(-0.6, len(gene) - 0.4)
     ax.set_xlabel("")
     ax.set_ylabel("")
-    ax.legend(frameon=False, loc="lower right", fontsize=8, handletextpad=0.3)
+    ax.legend(frameon=False, loc="lower right", fontsize=7.3, handletextpad=0.25)
     style_ax(ax)
 
 
@@ -165,12 +162,11 @@ def baseline_sensitivity(ax: plt.Axes, df: pd.DataFrame) -> None:
         .reset_index()
         .dropna(subset=["150M", "650M"])
     )
-    sizes = 28 + np.clip(shared["n_variants"], 0, 180) * 0.22
     ax.scatter(
         shared["150M"],
         shared["650M"],
-        s=sizes,
-        facecolor="#C8DCE1",
+        s=28,
+        facecolor="#B9D8E1",
         edgecolor="#6F8F99",
         linewidth=0.8,
         alpha=0.86,
@@ -182,26 +178,18 @@ def baseline_sensitivity(ax: plt.Axes, df: pd.DataFrame) -> None:
     ax.axvline(0, color="#C9C9C4", linewidth=1.0, zorder=1)
     ax.set_xlim(lim)
     ax.set_ylim(lim)
-    ax.set_xlabel("Δ CaLM weight with ESM-2 (150M)")
-    ax.set_ylabel("Δ CaLM weight with ESM-2 (650M)")
+    ax.set_xlabel(r"$\Delta w$ with ESM-2 (150M)")
+    ax.set_ylabel(r"$\Delta w$ with ESM-2 (650M)")
     style_ax(ax)
-    labels = shared.assign(diff=(shared["150M"] - shared["650M"]).abs()).nlargest(5, "diff")
-    for _, row in labels.iterrows():
-        ax.text(
-            row["150M"] + 0.015,
-            row["650M"] + 0.015,
-            row["Gene"],
-            fontsize=8.3,
-            color=COLORS["text"],
-            ha="left",
-            va="bottom",
-        )
+    pearson_r = shared["150M"].corr(shared["650M"], method="pearson")
+    ax.text(0.05, 0.94, rf"$r={pearson_r:.2f}$", transform=ax.transAxes, ha="left", va="top", fontsize=8)
+
 
 
 def main() -> None:
     df = load_data()
-    fig = plt.figure(figsize=(6.45, 6.0))
-    gs = fig.add_gridspec(2, 2, height_ratios=[1, 1.05], wspace=0.34, hspace=0.28)
+    fig = plt.figure(figsize=(6.10, 5.55))
+    gs = fig.add_gridspec(2, 2, height_ratios=[1, 1.03], wspace=0.27, hspace=0.24)
     ax_a = fig.add_subplot(gs[0, 0])
     ax_b = fig.add_subplot(gs[0, 1])
     ax_c = fig.add_subplot(gs[1, 0])
@@ -215,7 +203,7 @@ def main() -> None:
     for label, ax in zip("ABCD", [ax_a, ax_b, ax_c, ax_d]):
         add_panel_label(ax, label)
 
-    fig.subplots_adjust(left=0.12, right=0.98, top=0.92, bottom=0.10)
+    fig.subplots_adjust(left=0.13, right=0.98, top=0.93, bottom=0.11)
     for out in OUTS:
         out.parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(out, dpi=450)

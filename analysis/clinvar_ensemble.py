@@ -17,6 +17,8 @@ from scipy.stats import ttest_rel, wilcoxon
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import StratifiedGroupKFold
 
+from ensemble_optim import bayes_optimize_weights, grid_optimize_weights
+
 
 PATHOGENIC_LABELS = {"pathogenic", "likely_pathogenic"}
 KEY_COLS = [
@@ -67,39 +69,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=16)
     parser.add_argument("--pair-grid-step", type=float, default=0.01)
     parser.add_argument("--triple-grid-step", type=float, default=0.05)
+    parser.add_argument("--optimizer", choices=["grid", "bayes"], default="grid")
+    parser.add_argument("--bayes-init", type=int, default=10)
+    parser.add_argument("--bayes-iter", type=int, default=20)
+    parser.add_argument("--bayes-pair-step", type=float, default=0.001)
+    parser.add_argument("--bayes-triple-step", type=float, default=0.01)
     return parser.parse_args()
-
-
-def pair_weights(step: float) -> list[tuple[float, float]]:
-    values = np.arange(0.0, 1.0 + step / 2.0, step)
-    return [(float(1.0 - w), float(w)) for w in values]
-
-
-def triple_weights(step: float) -> list[tuple[float, float, float]]:
-    values = np.arange(0.0, 1.0 + step / 2.0, step)
-    weights = []
-    for w1 in values:
-        for w2 in values:
-            w3 = 1.0 - w1 - w2
-            if w3 >= -1e-9:
-                weights.append((float(w1), float(w2), float(max(0.0, w3))))
-    return weights
-
-
-def best_weights(
-    y_train: np.ndarray,
-    train_scores: list[np.ndarray],
-    candidates: list[tuple[float, ...]],
-) -> tuple[float, ...]:
-    best_auc = -np.inf
-    best_candidate = candidates[0]
-    for weights in candidates:
-        train_mix = sum(w * score for w, score in zip(weights, train_scores))
-        auc = roc_auc_score(y_train, train_mix)
-        if auc > best_auc:
-            best_auc = auc
-            best_candidate = weights
-    return best_candidate
 
 
 def mix_scores(weights: tuple[float, ...], scores: list[np.ndarray]) -> np.ndarray:
@@ -192,8 +167,6 @@ def main() -> None:
         ).split(df, y, groups=groups)
     )
 
-    pair_candidates = pair_weights(args.pair_grid_step)
-    triple_candidates = triple_weights(args.triple_grid_step)
     model_specs = [
         ("ESM-2 150M", ["ESM-2 150M"]),
         ("ESM-2 650M", ["ESM-2 650M"]),
@@ -219,12 +192,32 @@ def main() -> None:
             if len(components) == 1:
                 weights = (1.0,)
             else:
-                candidates = pair_candidates if len(components) == 2 else triple_candidates
                 train_scores = [
                     df.iloc[train_idx][SCORE_COLUMNS[component]].to_numpy()
                     for component in components
                 ]
-                weights = best_weights(y_train, train_scores, candidates)
+                if args.optimizer == "bayes":
+                    step = args.bayes_pair_step if len(components) == 2 else args.bayes_triple_step
+                    weights, train_auc, n_objective_evals = bayes_optimize_weights(
+                        y_train,
+                        train_scores,
+                        seed=args.seed + 1000 * fold + len(rows),
+                        n_init=args.bayes_init,
+                        n_iter=args.bayes_iter,
+                        candidate_step=step,
+                    )
+                else:
+                    step = args.pair_grid_step if len(components) == 2 else args.triple_grid_step
+                    weights, train_auc, n_objective_evals = grid_optimize_weights(
+                        y_train, train_scores, step
+                    )
+
+            if len(components) == 1:
+                train_auc = roc_auc_score(
+                    y_train,
+                    df.iloc[train_idx][SCORE_COLUMNS[components[0]]].to_numpy(),
+                )
+                n_objective_evals = 0
 
             test_scores = [
                 df.iloc[test_idx][SCORE_COLUMNS[component]].to_numpy()
@@ -237,6 +230,9 @@ def main() -> None:
                     "fold": fold,
                     "model": model_name,
                     "components": " + ".join(components),
+                    "optimizer": args.optimizer,
+                    "train_auc_at_selected_weights": train_auc,
+                    "n_objective_evals": n_objective_evals,
                     "test_auc": roc_auc_score(y_test, test_score),
                     "w_esm2_150m": weight_by_component.get("ESM-2 150M", 0.0),
                     "w_esm2_650m": weight_by_component.get("ESM-2 650M", 0.0),

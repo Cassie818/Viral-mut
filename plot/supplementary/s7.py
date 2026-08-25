@@ -12,9 +12,9 @@ from scipy.stats import pearsonr, spearmanr
 import matplotlib.pyplot as plt
 
 
-INPUT = Path("Results/Revision/len1022_aa_aggregation/len1022_calm_aa_aggregation_variant_scores.csv")
+INPUT = Path("Results/ClinVar/substitution_discordance/variant_discordance_scores.csv.gz")
 OUTPUT_DIR = Path("Results/ClinVar/substitution_discordance")
-FIGURE = Path("Figure/figS7_discordance_probability_space_alignment.png")
+FIGURE = Path("Figure/figS7.png")
 
 
 def main() -> None:
@@ -51,7 +51,7 @@ def main() -> None:
     figure, axis = plt.subplots(figsize=(5.1, 5.0))
     limit = float(np.ceil(np.nanpercentile(np.abs(np.r_[codon, aa_aggregated]), 99.7)))
 
-    # Pale points retain the full cohort while making the below-diagonal shift visible.
+    # Pale points retain the full cohort while making the signed shift visible.
     axis.scatter(codon, aa_aggregated, s=2.4, color="#8FB8C9", alpha=0.075, edgecolors="none", rasterized=True)
     axis.fill_between([-limit, limit], [-limit, limit], [-limit, -limit], color="#F7E6E2", alpha=0.65, zorder=0)
     axis.plot([-limit, limit], [-limit, limit], color="#575757", linewidth=0.85, linestyle=(0, (3, 2)), zorder=2)
@@ -75,7 +75,7 @@ def main() -> None:
     axis.text(
         0.96,
         0.08,
-        "Below diagonal:\naggregation reduces\ndiscordance magnitude",
+        "Below diagonal:\nlower signed discordance\nafter aggregation",
         transform=axis.transAxes,
         ha="right",
         va="bottom",

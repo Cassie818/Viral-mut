@@ -1,10 +1,12 @@
+import argparse
+import csv
+from pathlib import Path
 from typing import List, Tuple, Union
+
 from calm.sequence import CodonSequence
 import torch.nn.functional as F
 from calm import CaLM
 import numpy as np
-import pandas as pd
-import csv
 import torch
 
 
@@ -73,21 +75,29 @@ def read_fasta_nuc(file_path: str) -> List[Tuple[str, str]]:
     return sequences
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Export codon probabilities from CaLM.")
+    parser.add_argument("--gene-list", required=True, type=Path, help="One gene identifier per line.")
+    parser.add_argument("--fasta-dir", required=True, type=Path, help="Directory containing <gene>.fasta files.")
+    parser.add_argument("--output-dir", required=True, type=Path)
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
+    args = parse_args()
     calm = CaLMPluS()
-    gene_list = pd.read_csv("../bin/gene_info.txt", sep="\t", header=None)[0].tolist()
+    genes = [line.strip().split("\t")[0] for line in args.gene_list.read_text().splitlines() if line.strip()]
+    args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    for gene in gene_list:
-
-        seq_path = f"../data/Gene/{gene}.fasta"
-        sequence = read_fasta_nuc(seq_path)[0][1]
+    for gene in genes:
+        sequence = read_fasta_nuc(str(args.fasta_dir / f"{gene}.fasta"))[0][1]
         # remove the start token and end token
         logits = calm.get_logits(sequence)[:, 1:-1, ]
 
         tok_to_idx = calm.alphabet.tok_to_idx
         codons = [i for i in tok_to_idx]
 
-        csv_fname = f"../Results/{gene}_CaLM_grammaticality.csv"
+        csv_fname = args.output_dir / f"{gene}_CaLM_grammaticality.csv"
 
         with open(csv_fname, 'w', newline='') as csvfile:
             csv_writer = csv.writer(csvfile)

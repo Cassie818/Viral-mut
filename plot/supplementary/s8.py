@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Full gene-level scatter plots across two protein-model backgrounds."""
+"""Gene-level PLM-background and generic-ensembling controls."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from statsmodels.nonparametric.smoothers_lowess import lowess
 
 
 DATA = Path("Results/ClinVar/gene_level/gene_level_codon_contribution_summary.csv")
-OUT = Path("Figure/figS_gene_level_full_scatter.png")
+OUT = Path("Figure/figS8.png")
 
 TEXT = "#30302E"
 EDGE = "#8D8D88"
@@ -49,6 +49,7 @@ def panel(
     x_col: str,
     y_col: str,
     x_label: str,
+    y_label: str,
     background: str,
     rank_based: bool = False,
 ) -> None:
@@ -92,7 +93,7 @@ def panel(
     ax.text(0.98, 0.04, background, transform=ax.transAxes, ha="right", va="bottom", fontsize=7.2, color=TEXT)
     ax.axhline(0, color="#C9C9C4", linewidth=0.7, linestyle=(0, (3, 2)))
     ax.set_xlabel(x_label)
-    ax.set_ylabel("Cross-modal gain (AUROC)")
+    ax.set_ylabel(y_label)
     for spine in ax.spines.values():
         spine.set_color(EDGE)
         spine.set_linewidth(0.9)
@@ -104,25 +105,42 @@ def main() -> None:
     df = pd.read_csv(DATA)
     fig, axes = plt.subplots(2, 2, figsize=(7.2, 6.0), sharey=True)
 
-    panel(axes[0, 0], df, "esm2_calm_weight", "esm2_cross_modal_gain", "Optimised CaLM weight", "ESM-2 (650M)")
+    panel(
+        axes[0, 0],
+        df,
+        "esm1b_calm_weight",
+        "esm1b_gain_over_protein",
+        "Optimised CaLM weight",
+        r"$\Delta\mathrm{AUROC}_{+\mathrm{CaLM}}$",
+        "ESM-1b (650M)",
+    )
     panel(
         axes[0, 1],
         df,
-        "esm2_independent_calm_signal",
-        "esm2_cross_modal_gain",
-        "CaLM AUROC - ESM-2 (650M) AUROC",
-        "ESM-2 (650M)",
+        "esm1b_independent_calm_signal",
+        "esm1b_gain_over_protein",
+        r"$\Delta\mathrm{AUROC}_{\mathrm{single}}$",
+        r"$\Delta\mathrm{AUROC}_{+\mathrm{CaLM}}$",
+        "ESM-1b (650M)",
         rank_based=True,
     )
-    panel(axes[1, 0], df, "esm1b_calm_weight", "esm1b_gain_over_protein", "Optimised CaLM weight", "ESM-1b (650M)")
+    panel(
+        axes[1, 0],
+        df,
+        "esm2_calm_weight",
+        "esm2_cross_modal_advantage",
+        "Optimised CaLM weight",
+        r"$\Delta\mathrm{AUROC}_{\mathrm{adv}}$",
+        "PLM+PLM control",
+    )
     panel(
         axes[1, 1],
         df,
-        "esm1b_independent_calm_signal",
-        "esm1b_gain_over_protein",
-        "CaLM AUROC - ESM-1b (650M) AUROC",
-        "ESM-1b (650M)",
-        rank_based=True,
+        "esm2_independent_calm_signal",
+        "esm2_cross_modal_advantage",
+        r"$\Delta\mathrm{AUROC}_{\mathrm{single}}$",
+        r"$\Delta\mathrm{AUROC}_{\mathrm{adv}}$",
+        "PLM+PLM control",
     )
 
     for ax, label in zip(axes.flat, "ABCD"):

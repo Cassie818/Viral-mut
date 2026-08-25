@@ -1,9 +1,9 @@
+import argparse
 import csv
+from pathlib import Path
 from typing import List, Tuple
-import pandas as pd
 import torch
 import torch.nn.functional as F
-import numpy as np
 from itertools import groupby
 
 
@@ -77,20 +77,23 @@ def prepare_grammaticality_data(model_name: str,
             csv_writer.writerows(grammaticality)
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Export residue probabilities from an ESM model.")
+    parser.add_argument("--gene-list", required=True, type=Path, help="One gene identifier per line.")
+    parser.add_argument("--fasta-dir", required=True, type=Path, help="Directory containing <gene>_protein.fasta files.")
+    parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument("--model", default="esm2_t30_150M_UR50D")
+    return parser.parse_args()
+
+
 if __name__ == "__main__":
-    Gene_list = pd.read_csv("./bin/gene_info.txt", sep="\t", header=None)[0].tolist()
-    model_name = "esm2_t30_150M_UR50D"
+    args = parse_args()
+    genes = [line.strip().split("\t")[0] for line in args.gene_list.read_text().splitlines() if line.strip()]
+    args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    for gene in Gene_list:
-        seq_path = f"./data/Protein/{gene}_protein.fasta"
-        output_csv_path = f"./Results/{gene}_ESM2_grammaticality.csv"
-        # Prepare grammaticality data
-        prepare_grammaticality_data(model_name, seq_path, output_csv_path)
-
-        # Load grammaticality data from CSV
-        grammaticality: pd.DataFrame = pd.read_csv(output_csv_path)
-        # Save grammaticality data for 20 common amino acids
-        grammaticality = grammaticality[['A', 'C', 'D', 'E', 'F',
-                                         'G', 'H', 'I', 'K', 'L',
-                                         'M', 'N', 'P', 'Q', 'R',
-                                         'S', 'T', 'V', 'W', 'Y']]
+    for gene in genes:
+        prepare_grammaticality_data(
+            args.model,
+            str(args.fasta_dir / f"{gene}_protein.fasta"),
+            str(args.output_dir / f"{gene}_ESM2_grammaticality.csv"),
+        )

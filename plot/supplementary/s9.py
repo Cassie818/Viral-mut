@@ -15,7 +15,7 @@ DATA = Path(
     "Results/ClinMAVE/cross_platform_context/"
     "dataset_pair_modality_weights_150m_vs_650m_comparison.csv"
 )
-OUT = Path("Figure/figS_platform_baseline_concordance.png")
+OUT = Path("Figure/figS9.png")
 
 POINT = "#B9DDE9"
 EDGE = "#6F8F99"

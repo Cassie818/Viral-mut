@@ -12,6 +12,8 @@ from scipy.stats import ttest_rel
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import StratifiedGroupKFold
 
+from ensemble_optim import bayes_optimize_weights
+
 
 BASE = Path("Results/ClinMAVE")
 ESM1B = Path("Results/Revision/ClinMAVE_ESM1b_650M/clinmave_missense_all_with_esm1b_650m.csv")
@@ -27,8 +29,15 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--esm1b", type=Path, default=ESM1B)
     parser.add_argument("--base", type=Path, default=BASE)
+    parser.add_argument("--analysis-table", type=Path)
     parser.add_argument("--outdir", type=Path, default=OUTDIR)
     parser.add_argument("--folds", type=int, default=10)
+    parser.add_argument("--optimizer", choices=["grid", "bayes"], default="grid")
+    parser.add_argument("--score-scaling", choices=["raw", "standardized"], default="raw")
+    parser.add_argument("--seed", type=int, default=7)
+    parser.add_argument("--bayes-init", type=int, default=10)
+    parser.add_argument("--bayes-iter", type=int, default=20)
+    parser.add_argument("--write-analysis-table", action="store_true")
     parser.add_argument(
         "--drop-global-conflicts",
         action="store_true",
@@ -72,7 +81,26 @@ def standardize_train_test(train: pd.DataFrame, test: pd.DataFrame, cols: list[s
     return (train_x - mean) / sd, (test_x - mean) / sd
 
 
-def best_weight(y: np.ndarray, esm: np.ndarray, calm: np.ndarray) -> float:
+def best_weight(
+    y: np.ndarray,
+    esm: np.ndarray,
+    calm: np.ndarray,
+    *,
+    optimizer: str,
+    seed: int,
+    bayes_init: int,
+    bayes_iter: int,
+) -> float:
+    if optimizer == "bayes":
+        weights, _, _ = bayes_optimize_weights(
+            y,
+            [esm, calm],
+            seed=seed,
+            n_init=bayes_init,
+            n_iter=bayes_iter,
+            candidate_step=0.001,
+        )
+        return float(weights[1])
     best_w = 0.0
     best_auc = -np.inf
     for w in WEIGHTS:
@@ -110,7 +138,18 @@ def make_splits(df: pd.DataFrame, folds: int):
     return list(splitter.split(df, y, groups=groups)), "stratified_gene"
 
 
-def evaluate_dataset(df: pd.DataFrame, assay: str, case_class: str, folds: int) -> tuple[pd.DataFrame, dict]:
+def evaluate_dataset(
+    df: pd.DataFrame,
+    assay: str,
+    case_class: str,
+    folds: int,
+    *,
+    optimizer: str,
+    seed: int,
+    bayes_init: int,
+    bayes_iter: int,
+    score_scaling: str,
+) -> tuple[pd.DataFrame, dict]:
     splits, split_type = make_splits(df, folds)
     rows = []
     for fold, (train_idx, test_idx) in enumerate(splits, start=1):
@@ -119,10 +158,24 @@ def evaluate_dataset(df: pd.DataFrame, assay: str, case_class: str, folds: int) 
         y_train = train["label"].to_numpy()
         y_test = test["label"].to_numpy()
 
-        train_scaled, test_scaled = standardize_train_test(train, test, ["esm1b_650m_score", "calm_score"])
-        esm_train, calm_train = train_scaled[:, 0], train_scaled[:, 1]
-        esm_test, calm_test = test_scaled[:, 0], test_scaled[:, 1]
-        w = best_weight(y_train, esm_train, calm_train)
+        if score_scaling == "standardized":
+            train_scores, test_scores = standardize_train_test(
+                train, test, ["esm1b_650m_score", "calm_score"]
+            )
+        else:
+            train_scores = train[["esm1b_650m_score", "calm_score"]].to_numpy(float)
+            test_scores = test[["esm1b_650m_score", "calm_score"]].to_numpy(float)
+        esm_train, calm_train = train_scores[:, 0], train_scores[:, 1]
+        esm_test, calm_test = test_scores[:, 0], test_scores[:, 1]
+        w = best_weight(
+            y_train,
+            esm_train,
+            calm_train,
+            optimizer=optimizer,
+            seed=seed + 100 * fold,
+            bayes_init=bayes_init,
+            bayes_iter=bayes_iter,
+        )
 
         esm_auc = safe_roc_auc(y_test, esm_test)
         calm_auc = safe_roc_auc(y_test, calm_test)
@@ -133,6 +186,8 @@ def evaluate_dataset(df: pd.DataFrame, assay: str, case_class: str, folds: int) 
             "case_class": case_class,
             "fold": fold,
             "split_type": split_type,
+            "optimizer": optimizer,
+            "score_scaling": score_scaling,
             "n_train": len(train),
             "n_test": len(test),
             "n_test_genes": test["Gene"].nunique(),
@@ -153,6 +208,8 @@ def evaluate_dataset(df: pd.DataFrame, assay: str, case_class: str, folds: int) 
         "assay": assay,
         "case_class": case_class,
         "split_type": split_type,
+        "optimizer": optimizer,
+        "score_scaling": score_scaling,
         "n_variants": len(df),
         "n_cases": int(df["label"].sum()),
         "n_controls": int((1 - df["label"]).sum()),
@@ -177,6 +234,38 @@ def evaluate_dataset(df: pd.DataFrame, assay: str, case_class: str, folds: int) 
 def main() -> None:
     args = parse_args()
     args.outdir.mkdir(parents=True, exist_ok=True)
+
+    if args.analysis_table is not None:
+        source = pd.read_csv(args.analysis_table)
+        all_folds, summaries = [], []
+        for assay in ["DMS", "CBGE"]:
+            for case_class in ["lof", "gof"]:
+                df = source[
+                    (source["assay"] == assay)
+                    & (source["comparison"] == f"{assay}_{case_class}_vs_normal")
+                ].copy()
+                fold_df, summary = evaluate_dataset(
+                    df,
+                    assay,
+                    case_class,
+                    args.folds,
+                    optimizer=args.optimizer,
+                    seed=args.seed,
+                    bayes_init=args.bayes_init,
+                    bayes_iter=args.bayes_iter,
+                    score_scaling=args.score_scaling,
+                )
+                all_folds.append(fold_df)
+                summaries.append(summary)
+        pd.concat(all_folds, ignore_index=True).to_csv(
+            args.outdir / "clinmave_esm1b_650m_calm_cv_fold_metrics.csv", index=False
+        )
+        pd.DataFrame(summaries).to_csv(
+            args.outdir / "clinmave_esm1b_650m_calm_cv_summary.csv", index=False
+        )
+        print(pd.DataFrame(summaries).to_string(index=False))
+        print(f"\nWrote outputs to {args.outdir}")
+        return
 
     esm = pd.read_csv(args.esm1b)
     esm = esm[ESM_COLS + ["assay", "effect_class", "LLR", "esm1b_650m_llr", "esm1b_650m_score"]]
@@ -224,14 +313,27 @@ def main() -> None:
             audits.append(dup_audit)
             merged_outputs.append(df)
 
-            fold_df, summary = evaluate_dataset(df, assay, case_class, args.folds)
+            fold_df, summary = evaluate_dataset(
+                df,
+                assay,
+                case_class,
+                args.folds,
+                optimizer=args.optimizer,
+                seed=args.seed,
+                bayes_init=args.bayes_init,
+                bayes_iter=args.bayes_iter,
+                score_scaling=args.score_scaling,
+            )
             all_folds.append(fold_df)
             summaries.append(summary)
 
     pd.concat(all_folds, ignore_index=True).to_csv(args.outdir / "clinmave_esm1b_650m_calm_cv_fold_metrics.csv", index=False)
     pd.DataFrame(summaries).to_csv(args.outdir / "clinmave_esm1b_650m_calm_cv_summary.csv", index=False)
     pd.DataFrame(audits).to_csv(args.outdir / "clinmave_esm1b_650m_calm_merge_audit.csv", index=False)
-    pd.concat(merged_outputs, ignore_index=True).to_csv(args.outdir / "clinmave_esm1b_650m_calm_analysis_table.csv", index=False)
+    if args.write_analysis_table:
+        pd.concat(merged_outputs, ignore_index=True).to_csv(
+            args.outdir / "clinmave_esm1b_650m_calm_analysis_table.csv", index=False
+        )
 
     print(pd.DataFrame(summaries).to_string(index=False))
     print(f"\nWrote outputs to {args.outdir}")

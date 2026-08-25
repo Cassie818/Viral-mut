@@ -1,0 +1,28 @@
+% Requires \usepackage{booktabs,longtable}
+\begin{longtable}{p{0.24\textwidth} p{0.13\textwidth} p{0.53\textwidth}}
+\caption{Mutational-context covariates used in the context-control analysis.}\label{tab:context_covariates}\\
+\toprule
+Covariate & Encoding & Definition \\
+\midrule
+\endfirsthead
+\toprule
+Covariate & Encoding & Definition \\
+\midrule
+\endhead
+Reference codon & Categorical & Wild-type DNA codon (U converted to T). \\
+Mutant codon & Categorical & Mutant DNA codon (U converted to T). \\
+Mutated codon position & Categorical & Position 1, 2, or 3 within the codon. \\
+Reference nucleotide & Categorical & Wild-type nucleotide at the mutated position. \\
+Mutant nucleotide & Categorical & Mutant nucleotide at the mutated position. \\
+Nucleotide substitution & Categorical & Directed substitution, for example C>T. \\
+Transition status & Numeric & 1 for A>G, G>A, C>T, or T>C; otherwise 0. \\
+Transversion status & Numeric & 1 minus transition status. \\
+Reference codon GC content & Numeric & Fraction of G or C nucleotides in the reference codon. \\
+Mutant codon GC content & Numeric & Fraction of G or C nucleotides in the mutant codon. \\
+Change in codon GC content & Numeric & Mutant minus reference codon GC content. \\
+Reference within-codon CpG status & Numeric & 1 if the reference codon contains CG; otherwise 0. \\
+Mutant within-codon CpG status & Numeric & 1 if the mutant codon contains CG; otherwise 0. \\
+Change in within-codon CpG status & Numeric & Mutant minus reference within-codon CpG status. \\
+Local codon degeneracy & Categorical & Number of possible nucleotides at the mutated position that preserve the reference amino acid. \\
+\bottomrule
+\end{longtable}

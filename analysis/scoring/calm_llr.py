@@ -1,5 +1,5 @@
-from bin.score_calm_codon_logits import read_fasta_nuc
-from bin.config import codon_list
+from calm_probabilities import read_fasta_nuc
+from config import codon_list
 import pandas as pd
 import numpy as np
 from typing import List
