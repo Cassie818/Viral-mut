@@ -13,7 +13,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
+from scipy.stats import rankdata
 from sklearn.metrics import roc_auc_score
+from sklearn.model_selection import StratifiedKFold
 
 
 INPUT = Path("Results/Revision/len1022_model_control/len1022_model_control_score_table_complete_cases.csv")
@@ -90,20 +92,90 @@ CODON_TABLE = {
 }
 
 
+def auc_rank_sum(y: np.ndarray, score: np.ndarray) -> float:
+    y_bool = y.astype(bool)
+    n_pos = int(y_bool.sum())
+    n_neg = int(len(y_bool) - n_pos)
+    if n_pos == 0 or n_neg == 0:
+        raise ValueError("AUROC requires at least one positive and one negative label")
+    ranks = rankdata(score, method="average")
+    pos_rank_sum = float(ranks[y_bool].sum())
+    return (pos_rank_sum - n_pos * (n_pos + 1) / 2) / (n_pos * n_neg)
+
+
 def best_weight(y: np.ndarray, a: np.ndarray, b: np.ndarray) -> tuple[float, float]:
     best_auc = -np.inf
     best_w = np.nan
     for w in np.linspace(0, 1, 101):
         score = (1 - w) * a + w * b
-        auc = roc_auc_score(y, score)
+        auc = auc_rank_sum(y, score)
         if auc > best_auc:
             best_auc = auc
             best_w = w
     return float(best_w), float(best_auc)
 
 
-def per_gene_summary(df: pd.DataFrame, min_pos: int = 5, min_neg: int = 5) -> pd.DataFrame:
+def nested_pair_auc(
+    y: np.ndarray,
+    a: np.ndarray,
+    b: np.ndarray,
+    *,
+    n_splits: int,
+    seed: int,
+) -> tuple[float, float, float, float, int, list[dict[str, float | int]]]:
+    """Select pair weights on inner training folds and evaluate held-out variants."""
+    splitter = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=seed)
+    heldout_score = np.full(len(y), np.nan, dtype=float)
+    weights: list[float] = []
+    fold_rows: list[dict[str, float | int]] = []
+
+    for fold, (train_idx, test_idx) in enumerate(splitter.split(a, y), start=1):
+        weight, train_auc = best_weight(y[train_idx], a[train_idx], b[train_idx])
+        test_score = (1 - weight) * a[test_idx] + weight * b[test_idx]
+        heldout_score[test_idx] = test_score
+        weights.append(weight)
+        fold_rows.append(
+            {
+                "fold": fold,
+                "weight_second": weight,
+                "train_auc_at_selected_weight": train_auc,
+                "test_auc_at_selected_weight": auc_rank_sum(y[test_idx], test_score),
+                "n_train": int(len(train_idx)),
+                "n_test": int(len(test_idx)),
+                "n_test_pathogenic": int(y[test_idx].sum()),
+                "n_test_benign": int(len(test_idx) - y[test_idx].sum()),
+            }
+        )
+
+    if np.isnan(heldout_score).any():
+        raise RuntimeError("Nested CV did not score every held-out variant")
+    return (
+        float(np.mean(weights)),
+        float(np.std(weights, ddof=1)) if len(weights) > 1 else 0.0,
+        float(auc_rank_sum(y, heldout_score)),
+        float(np.mean([row["train_auc_at_selected_weight"] for row in fold_rows])),
+        int(len(fold_rows)),
+        fold_rows,
+    )
+
+
+def per_gene_nested_summary(
+    df: pd.DataFrame,
+    min_pos: int = 5,
+    min_neg: int = 5,
+    max_splits: int = 5,
+    seed: int = 16,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     rows: list[dict[str, float | int | str]] = []
+    fold_rows: list[dict[str, float | int | str]] = []
+    pair_specs = [
+        ("ESM-2 150M + 650M", "esm2_150m_score", "esm2_650m_score"),
+        ("ESM-2 650M + ESM-1b 650M", "esm2_650m_score", "esm1b_650m_score"),
+        ("ESM-2 650M + CaLM", "esm2_650m_score", "calm_score"),
+        ("ESM-2 150M + CaLM", "esm2_150m_score", "calm_score"),
+        ("ESM-1b 650M + CaLM", "esm1b_650m_score", "calm_score"),
+    ]
+
     for gene, gene_df in df.groupby("Gene_gene", sort=True):
         y = gene_df["label"].to_numpy()
         n_pos = int(y.sum())
@@ -115,49 +187,52 @@ def per_gene_summary(df: pd.DataFrame, min_pos: int = 5, min_neg: int = 5) -> pd
         s650 = gene_df["esm2_650m_score"].to_numpy(dtype=float)
         s1b = gene_df["esm1b_650m_score"].to_numpy(dtype=float)
         calm = gene_df["calm_score"].to_numpy(dtype=float)
+        score_map = {
+            "esm2_150m_score": s150,
+            "esm2_650m_score": s650,
+            "esm1b_650m_score": s1b,
+            "calm_score": calm,
+        }
 
-        w_150_650, auc_150_650 = best_weight(y, s150, s650)
-        w_650_calm, auc_650_calm = best_weight(y, s650, calm)
-        w_150_calm, auc_150_calm = best_weight(y, s150, calm)
-        w_650_1b, auc_650_1b = best_weight(y, s650, s1b)
-        w_1b_calm, auc_1b_calm = best_weight(y, s1b, calm)
+        row: dict[str, float | int | str] = {
+            "gene": gene,
+            "n": int(len(gene_df)),
+            "n_pathogenic": n_pos,
+            "n_benign": n_neg,
+            "protein_length": int(gene_df["protein_length"].iloc[0]),
+            "nested_cv_splits": int(min(max_splits, n_pos, n_neg)),
+            "ESM-2 150M AUROC": roc_auc_score(y, s150),
+            "ESM-2 650M AUROC": roc_auc_score(y, s650),
+            "ESM-1b 650M AUROC": roc_auc_score(y, s1b),
+            "CaLM AUROC": roc_auc_score(y, calm),
+        }
 
-        auc_150 = roc_auc_score(y, s150)
-        auc_650 = roc_auc_score(y, s650)
-        auc_1b = roc_auc_score(y, s1b)
-        auc_calm = roc_auc_score(y, calm)
+        for offset, (label, first_col, second_col) in enumerate(pair_specs):
+            weight, weight_sd, auc, train_auc, n_folds, pair_folds = nested_pair_auc(
+                y,
+                score_map[first_col],
+                score_map[second_col],
+                n_splits=int(row["nested_cv_splits"]),
+                seed=seed + 1009 * offset + len(rows),
+            )
+            row[f"{label} AUROC"] = auc
+            row[f"{label} weight_second"] = weight
+            row[f"{label} weight_second_sd"] = weight_sd
+            row[f"{label} mean_train_auc_at_selected_weights"] = train_auc
+            row[f"{label} n_outer_folds"] = n_folds
+            for fold_row in pair_folds:
+                fold_rows.append({"gene": gene, "model": label, **fold_row})
 
-        rows.append(
-            {
-                "gene": gene,
-                "n": int(len(gene_df)),
-                "n_pathogenic": n_pos,
-                "n_benign": n_neg,
-                "protein_length": int(gene_df["protein_length"].iloc[0]),
-                "ESM-2 150M AUROC": auc_150,
-                "ESM-2 650M AUROC": auc_650,
-                "ESM-1b 650M AUROC": auc_1b,
-                "CaLM AUROC": auc_calm,
-                "ESM-2 150M + 650M AUROC": auc_150_650,
-                "ESM-2 150M + 650M weight_second": w_150_650,
-                "ESM-2 650M + ESM-1b 650M AUROC": auc_650_1b,
-                "ESM-2 650M + ESM-1b 650M weight_second": w_650_1b,
-                "ESM-2 650M + CaLM AUROC": auc_650_calm,
-                "ESM-2 650M + CaLM weight_second": w_650_calm,
-                "ESM-2 150M + CaLM AUROC": auc_150_calm,
-                "ESM-2 150M + CaLM weight_second": w_150_calm,
-                "ESM-1b 650M + CaLM AUROC": auc_1b_calm,
-                "ESM-1b 650M + CaLM weight_second": w_1b_calm,
-                "650M_minus_150M": auc_650 - auc_150,
-                "150M650M_minus_650M": auc_150_650 - auc_650,
-                "650M1b_minus_650M": auc_650_1b - auc_650,
-                "650MCaLM_minus_650M": auc_650_calm - auc_650,
-                "1bCaLM_minus_1b": auc_1b_calm - auc_1b,
-                "650MCaLM_minus_150M650M": auc_650_calm - auc_150_650,
-                "650MCaLM_minus_650M1b": auc_650_calm - auc_650_1b,
-            }
-        )
-    return pd.DataFrame(rows)
+        row["650M_minus_150M"] = row["ESM-2 650M AUROC"] - row["ESM-2 150M AUROC"]
+        row["150M650M_minus_650M"] = row["ESM-2 150M + 650M AUROC"] - row["ESM-2 650M AUROC"]
+        row["650M1b_minus_650M"] = row["ESM-2 650M + ESM-1b 650M AUROC"] - row["ESM-2 650M AUROC"]
+        row["650MCaLM_minus_650M"] = row["ESM-2 650M + CaLM AUROC"] - row["ESM-2 650M AUROC"]
+        row["1bCaLM_minus_1b"] = row["ESM-1b 650M + CaLM AUROC"] - row["ESM-1b 650M AUROC"]
+        row["650MCaLM_minus_150M650M"] = row["ESM-2 650M + CaLM AUROC"] - row["ESM-2 150M + 650M AUROC"]
+        row["650MCaLM_minus_650M1b"] = row["ESM-2 650M + CaLM AUROC"] - row["ESM-2 650M + ESM-1b 650M AUROC"]
+        rows.append(row)
+
+    return pd.DataFrame(rows), pd.DataFrame(fold_rows)
 
 
 def fit_regression(df: pd.DataFrame, x_col: str, y_col: str, label: str, weighted: bool) -> dict[str, float | str | int]:
@@ -349,6 +424,42 @@ def sequence_confounder_control(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Data
     valid = valid.merge(gene_comp.reset_index(), on="Gene_gene", how="left")
     valid = valid[valid["valid_snv_codon"] == 1].copy()
     valid = valid.dropna(subset=["calm_score", "esm2_650m_score", "gene_gc", "gene_cpg_density"])
+    if valid.empty:
+        summary = pd.DataFrame(
+            [
+                {
+                    "analysis": "sequence_confounder_control_skipped",
+                    "n_variants": 0,
+                    "n_genes": 0,
+                    "focal_predictor": "",
+                    "coef": np.nan,
+                    "coef_95ci_low": np.nan,
+                    "coef_95ci_high": np.nan,
+                    "odds_ratio": np.nan,
+                    "or_95ci_low": np.nan,
+                    "or_95ci_high": np.nan,
+                    "p_value": np.nan,
+                    "auroc": np.nan,
+                    "pseudo_r2_mcfadden": np.nan,
+                    "delta_auroc_vs_base": np.nan,
+                    "skip_reason": "no variants with available gene FASTA composition covariates",
+                }
+            ]
+        )
+        residual_meta = pd.DataFrame(
+            [
+                {
+                    "analysis": "calm_residualization_skipped",
+                    "outcome": "z_calm_score",
+                    "n_variants": 0,
+                    "n_genes": 0,
+                    "r_squared": np.nan,
+                    "covariates": "",
+                    "skip_reason": "no variants with available gene FASTA composition covariates",
+                }
+            ]
+        )
+        return summary, residual_meta, valid
 
     valid["z_calm_score"] = zscore(valid["calm_score"])
     valid["z_esm2_650m_score"] = zscore(valid["esm2_650m_score"])
@@ -468,36 +579,19 @@ def summarize_core_analyses(new_per_gene: pd.DataFrame, new_regs: pd.DataFrame, 
     return pd.DataFrame(rows)
 
 
-def main() -> None:
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    df = pd.read_csv(INPUT)
-    df = df.drop_duplicates(subset=["variant_id", "Gene_gene"]).copy()
-
-    cohort_summary = pd.DataFrame(
-        [
-            {
-                "cohort": "len1022_complete_cases",
-                "n_variants": int(len(df)),
-                "n_genes": int(df["Gene_gene"].nunique()),
-                "n_pathogenic": int((df["label"] == 1).sum()),
-                "n_benign": int((df["label"] == 0).sum()),
-                "min_protein_length": int(df["protein_length"].min()),
-                "max_protein_length": int(df["protein_length"].max()),
-            }
-        ]
+def add_gene_level_derived_columns(per_gene: pd.DataFrame) -> pd.DataFrame:
+    out = per_gene.copy()
+    out["codon_dependency_index"] = out["ESM-2 650M + CaLM weight_second"]
+    out["delta_delta_auroc"] = out["650MCaLM_minus_150M650M"]
+    out["independent_calm_minus_650m"] = out["CaLM AUROC"] - out["ESM-2 650M AUROC"]
+    out["inverse_variance_weight"] = (
+        out["n_pathogenic"] * out["n_benign"] / (out["n_pathogenic"] + out["n_benign"])
     )
-    cohort_summary.to_csv(OUT_DIR / "cohort_summary.csv", index=False)
+    return out
 
-    per_gene = per_gene_summary(df)
-    per_gene["codon_dependency_index"] = per_gene["ESM-2 650M + CaLM weight_second"]
-    per_gene["delta_delta_auroc"] = per_gene["650MCaLM_minus_150M650M"]
-    per_gene["independent_calm_minus_650m"] = per_gene["CaLM AUROC"] - per_gene["ESM-2 650M AUROC"]
-    per_gene["inverse_variance_weight"] = (
-        per_gene["n_pathogenic"] * per_gene["n_benign"] / (per_gene["n_pathogenic"] + per_gene["n_benign"])
-    )
-    per_gene.to_csv(OUT_DIR / "per_gene_ensemble_summary.csv", index=False)
 
-    regs = pd.DataFrame(
+def gene_delta_delta_regressions(per_gene: pd.DataFrame) -> pd.DataFrame:
+    return pd.DataFrame(
         [
             fit_regression(
                 per_gene,
@@ -543,26 +637,54 @@ def main() -> None:
             ),
         ]
     )
-    regs.to_csv(OUT_DIR / "per_gene_delta_delta_regressions.csv", index=False)
+
+
+def main() -> None:
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    df = pd.read_csv(INPUT)
+    df = df.drop_duplicates(subset=["variant_id", "Gene_gene"]).copy()
+
+    cohort_summary = pd.DataFrame(
+        [
+            {
+                "cohort": "len1022_complete_cases",
+                "n_variants": int(len(df)),
+                "n_genes": int(df["Gene_gene"].nunique()),
+                "n_pathogenic": int((df["label"] == 1).sum()),
+                "n_benign": int((df["label"] == 0).sum()),
+                "min_protein_length": int(df["protein_length"].min()),
+                "max_protein_length": int(df["protein_length"].max()),
+            }
+        ]
+    )
+    cohort_summary.to_csv(OUT_DIR / "cohort_summary.csv", index=False)
+
+    nested_per_gene, nested_folds = per_gene_nested_summary(df)
+    nested_per_gene = add_gene_level_derived_columns(nested_per_gene)
+    nested_per_gene.to_csv(OUT_DIR / "per_gene_nested_ensemble_summary.csv", index=False)
+    nested_folds.to_csv(OUT_DIR / "per_gene_nested_cv_fold_metrics.csv", index=False)
+    nested_regs = gene_delta_delta_regressions(nested_per_gene)
+    nested_regs.to_csv(OUT_DIR / "per_gene_nested_delta_delta_regressions.csv", index=False)
 
     seq_summary, residual_meta, seq_features = sequence_confounder_control(df)
     seq_summary.to_csv(OUT_DIR / "calm_sequence_confounder_regression_summary.csv", index=False)
     residual_meta.to_csv(OUT_DIR / "calm_sequence_confounder_residualization_summary.csv", index=False)
     seq_features.to_csv(OUT_DIR / "calm_sequence_confounder_variant_features.csv", index=False)
 
-    comparison = summarize_core_analyses(per_gene, regs, seq_summary)
+    comparison = summarize_core_analyses(nested_per_gene, nested_regs, seq_summary)
     comparison.to_csv(OUT_DIR / "core_analysis_conclusion_check.csv", index=False)
 
     print("Cohort")
     print(cohort_summary.to_string(index=False))
-    print("\nPer-gene panel")
+    print("\nNested CV per-gene panel")
     print(
-        per_gene[
+        nested_per_gene[
             [
                 "gene",
                 "n",
                 "n_pathogenic",
                 "n_benign",
+                "nested_cv_splits",
                 "ESM-2 650M AUROC",
                 "CaLM AUROC",
                 "ESM-2 150M + 650M AUROC",
@@ -575,8 +697,8 @@ def main() -> None:
         .describe(include="all")
         .to_string()
     )
-    print("\nRegressions")
-    print(regs.to_string(index=False, float_format=lambda v: f"{v:.6g}"))
+    print("\nNested CV regressions")
+    print(nested_regs.to_string(index=False, float_format=lambda v: f"{v:.6g}"))
     print("\nSequence confounder control")
     print(seq_summary.to_string(index=False, float_format=lambda v: f"{v:.6g}"))
     print("\nResidualization")

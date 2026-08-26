@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Gene-level codon contribution summaries for the ClinVar cohort."""
+"""Gene-level codon contribution summaries for the ClinVar cohort.
+
+Primary Fig. 6 summaries use per-gene nested cross-validation: ensemble
+weights are selected inside each gene on training folds and AUROC gains are
+computed only from held-out variants.
+"""
 
 from __future__ import annotations
 
@@ -193,7 +198,16 @@ def write_ranked_set_tables(df: pd.DataFrame) -> None:
 
 def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    per_gene = pd.read_csv(IN_DIR / "per_gene_ensemble_summary.csv")
+    per_gene_path = IN_DIR / "per_gene_nested_ensemble_summary.csv"
+    if not per_gene_path.exists():
+        raise FileNotFoundError(
+            f"Missing nested-CV gene-level table: {per_gene_path}. "
+            "Run analysis/clinvar_gene_prepare.py first."
+        )
+    per_gene = pd.read_csv(per_gene_path)
+    nested_fold_path = IN_DIR / "per_gene_nested_cv_fold_metrics.csv"
+    if nested_fold_path.exists():
+        pd.read_csv(nested_fold_path).to_csv(OUT_DIR / "gene_level_nested_cv_fold_metrics.csv", index=False)
     ranked = add_rankings(per_gene)
     ranked.to_csv(OUT_DIR / "gene_level_codon_contribution_summary.csv", index=False)
 
@@ -296,7 +310,10 @@ def main() -> None:
     summary = pd.DataFrame(
         [
             {
-                "analysis": "gene_level_codon_contribution",
+                "analysis": "nested_cv_gene_level_codon_contribution"
+                if "nested_cv_splits" in ranked.columns
+                else "gene_level_codon_contribution",
+                "source_table": per_gene_path.name,
                 "n_genes": int(len(ranked)),
                 "n_top_decile": int(np.ceil(len(ranked) * 0.10)),
                 "mean_esm2_calm_weight": float(ranked["esm2_calm_weight"].mean()),

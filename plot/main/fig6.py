@@ -457,7 +457,7 @@ def main() -> None:
         df,
         "esm2_calm_weight",
         "esm2_cross_modal_gain",
-        "Optimized CaLM weight",
+        "Mean CV-selected CaLM weight",
         r"$\Delta\mathrm{AUROC}_{+\mathrm{CaLM}}$",
         ROSE,
     )
@@ -472,8 +472,6 @@ def main() -> None:
         stat_mode="spearman",
         show_lowess=True,
     )
-    ax_b.set_ylabel("")
-    ax_b.tick_params(axis="y", labelleft=False)
     ax_a.set_ylim(-0.15, 0.30)
     ax_b.set_ylim(-0.15, 0.30)
     top_gene_bar_panel(
@@ -481,12 +479,12 @@ def main() -> None:
         df,
         "esm2_calm_weight",
         "Top genes by CaLM weight",
-        "Optimized CaLM weight",
+        "Mean CV-selected CaLM weight",
         "{:.2f}",
         n=10,
-        xlim=(0.95, 1.018),
-        bar_left=0.95,
-        label_inside=False,
+        xlim=(0, 1.02),
+        bar_left=0.0,
+        label_inside=True,
         show_n=False,
     )
     top_gene_bar_panel(

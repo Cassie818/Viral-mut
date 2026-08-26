@@ -1,4 +1,4 @@
-# Codon-level information complements protein language models for missense variant effect prediction
+# Codon-level information complements protein language models for missense-variant effect prediction
 
 The project compares codon-level language-model scores from CaLM with residue-level protein language-model scores from ESM-2 and ESM-1b to test whether codon-resolution information contributes to missense-variant interpretation beyond protein-level constraints.
 
@@ -27,7 +27,7 @@ plot/
   main/                 Main-figure scripts
   supplementary/        Supplementary-figure scripts for Figs. S1--S9
 Figure/                 Final manuscript figures
-Results/                Final result tables and sensitivity outputs
+Results/                Final result tables
 ```
 
 ## Main Analyses
@@ -69,9 +69,8 @@ Scoring utilities:
 - `analysis/scoring/clinmave_esm2_650m.py`
 - `analysis/scoring/clinmave_esm1b_650m.py`
 
-Bayesian optimisation is retained as a sensitivity analysis under
-`analysis/sensitivity/`; its final outputs are stored under
-`Results/Sensitivity/bayesian_gene_level/`.
+Sensitivity analyses are retained under `analysis/sensitivity/` where they are
+part of the current analysis workflow.
 
 ## Dependencies
 

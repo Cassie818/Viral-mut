@@ -110,7 +110,7 @@ def main() -> None:
         df,
         "esm1b_calm_weight",
         "esm1b_gain_over_protein",
-        "Optimised CaLM weight",
+        "Mean CV-selected CaLM weight",
         r"$\Delta\mathrm{AUROC}_{+\mathrm{CaLM}}$",
         "ESM-1b (650M)",
     )
@@ -129,7 +129,7 @@ def main() -> None:
         df,
         "esm2_calm_weight",
         "esm2_cross_modal_advantage",
-        "Optimised CaLM weight",
+        "Mean CV-selected CaLM weight",
         r"$\Delta\mathrm{AUROC}_{\mathrm{adv}}$",
         "PLM+PLM control",
     )
