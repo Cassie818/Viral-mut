@@ -186,8 +186,8 @@ def main() -> None:
     build_summary_table(folds, summaries).to_csv(
         table_dir / "clinmave_functional_class_results.csv", index=False
     )
-    plot_gof_deltas(folds, figure_dir / "figS5.png")
-    plot_weights(folds, figure_dir / "figS6.png")
+    plot_gof_deltas(folds, figure_dir / "figS6.png")
+    plot_weights(folds, figure_dir / "figS7.png")
 
 
 if __name__ == "__main__":

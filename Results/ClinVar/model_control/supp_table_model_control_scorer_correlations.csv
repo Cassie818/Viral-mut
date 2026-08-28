@@ -1,0 +1,4 @@
+redundancy_rank,baseline_scorer,added_scorer,pearson_r,spearman_rho,scorer_modality,control_role,n_variants
+1,ESM-2 650M,ESM-2 150M,0.8432733248752503,0.8364757152688007,protein LM,weak PLM placeholder,71436
+2,ESM-2 650M,ESM-1b 650M,0.8208124565816044,0.8300403701028449,protein LM,strong PLM placeholder,71436
+3,ESM-2 650M,CaLM,0.6793364984349105,0.6311605919006344,codon-level LM,cross-modal codon scorer,71436

@@ -158,7 +158,7 @@ def main() -> None:
         context_covariates(),
         table_dir / "Supplementary_Table_S4_mutational_context_covariates.tex",
     )
-    plot_conditional_deltas(paired, figure_dir / "figS4.png")
+    plot_conditional_deltas(paired, figure_dir / "figS5.png")
 
 
 if __name__ == "__main__":

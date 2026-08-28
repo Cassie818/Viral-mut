@@ -8,7 +8,8 @@ This directory contains the current ClinVar files.
   cohort counts, and model-score complete cases used for the main model-control
   analyses.
 - `model_control/`: PLM/CaLM model-combination summaries, fold metrics, paired
-  tests, ensemble weights, and supplementary model-control statistics.
+  tests, same-modality placeholder controls, ensemble weights, and supplementary
+  model-control statistics.
 - `context_control/`: fixed ESM-2 (650M) mutational-context control results,
   including fold-level AUROCs and all prespecified paired comparisons.
 - `substitution_discordance/`: CaLM amino-acid aggregation, degeneracy, and

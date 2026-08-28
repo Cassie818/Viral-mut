@@ -4,6 +4,7 @@
 Outputs:
 - all pairwise fold-level statistics, including non-significant comparisons
 - fold-level delta AUROC distributions for planned contrasts
+- same-modality placeholder control for generic ensembling
 - gene-wise versus variant-wise CV comparison
 - per-fold ensemble-weight distributions
 """
@@ -61,6 +62,16 @@ PLANNED_CONTRASTS = [
     ("ESM-2 150M + ESM-2 650M", "ESM-2 650M", "ESM-2 150M + ESM-2 650M vs ESM-2 650M"),
     ("ESM-2 650M + ESM-1b 650M", "ESM-2 650M", "ESM-2 650M + ESM-1b 650M vs ESM-2 650M"),
     ("ESM-2 650M + CaLM", "ESM-2 650M", "ESM-2 650M + CaLM vs ESM-2 650M"),
+    (
+        "ESM-2 650M + CaLM",
+        "ESM-2 150M + ESM-2 650M",
+        "ESM-2 650M + CaLM vs same-modality placeholder",
+    ),
+    (
+        "ESM-2 650M + ESM-1b 650M",
+        "ESM-1b 650M",
+        "Strong same-modality placeholder vs ESM-1b 650M",
+    ),
     ("ESM-1b 650M + CaLM", "ESM-1b 650M", "ESM-1b 650M + CaLM vs ESM-1b 650M"),
     (
         "ESM-2 650M + ESM-1b 650M + CaLM",
@@ -245,6 +256,12 @@ def plot_fold_delta_distribution(gene_folds: pd.DataFrame) -> None:
         "ESM-2 150M + ESM-2 650M vs ESM-2 650M": "ESM-2 (150M) + ESM-2 (650M) vs ESM-2 (650M)",
         "ESM-2 650M + ESM-1b 650M vs ESM-2 650M": "ESM-2 (650M) + ESM-1b (650M) vs ESM-2 (650M)",
         "ESM-2 650M + CaLM vs ESM-2 650M": "ESM-2 (650M) + CaLM vs ESM-2 (650M)",
+        "ESM-2 650M + CaLM vs same-modality placeholder": (
+            "ESM-2 (650M) + CaLM vs ESM-2 (150M) + ESM-2 (650M)"
+        ),
+        "Strong same-modality placeholder vs ESM-1b 650M": (
+            "ESM-1b (650M) + ESM-2 (650M) vs ESM-1b (650M)"
+        ),
         "ESM-1b 650M + CaLM vs ESM-1b 650M": "ESM-1b (650M) + CaLM vs ESM-1b (650M)",
         "Triple model vs ESM-2 650M + ESM-1b 650M": (
             "ESM-2 (650M) + ESM-1b (650M) + CaLM vs "
@@ -256,9 +273,17 @@ def plot_fold_delta_distribution(gene_folds: pd.DataFrame) -> None:
             rows.append({"contrast": label, "fold": fold, "delta": delta})
     df = pd.DataFrame(rows)
     order = [label for _, _, label in PLANNED_CONTRASTS]
-    fig, ax = plt.subplots(figsize=(6.6, 3.0))
+    fig, ax = plt.subplots(figsize=(6.6, 3.35))
     rng = np.random.default_rng(3)
-    colors = [COLORS["grey"], COLORS["lilac"], COLORS["green"], COLORS["rose"], COLORS["blue"]]
+    colors = [
+        COLORS["grey"],
+        COLORS["lilac"],
+        COLORS["green"],
+        COLORS["teal"],
+        COLORS["yellow"],
+        COLORS["rose"],
+        COLORS["blue"],
+    ]
     for idx, contrast in enumerate(order):
         vals = df[df["contrast"] == contrast]["delta"].to_numpy(float)
         y = np.full_like(vals, idx, dtype=float) + rng.normal(0, 0.055, size=len(vals))
@@ -273,6 +298,213 @@ def plot_fold_delta_distribution(gene_folds: pd.DataFrame) -> None:
     ax.set_xlabel("Fold-level ΔAUROC")
     format_ax(ax)
     fig.tight_layout()
+    fig.savefig(FIG_DIR / "figS2.png", dpi=600, bbox_inches="tight")
+    plt.close(fig)
+
+
+def write_score_correlation_audit(score_df: pd.DataFrame) -> pd.DataFrame:
+    esm2_baseline = SCORE_COLUMNS["ESM-2 650M"]
+    esm1b_baseline = SCORE_COLUMNS["ESM-1b 650M"]
+    rows = []
+    for baseline_name, baseline_col, scorer, col in [
+        ("ESM-2 650M", esm2_baseline, "ESM-2 150M", SCORE_COLUMNS["ESM-2 150M"]),
+        ("ESM-2 650M", esm2_baseline, "ESM-1b 650M", SCORE_COLUMNS["ESM-1b 650M"]),
+        ("ESM-2 650M", esm2_baseline, "CaLM", SCORE_COLUMNS["CaLM"]),
+        ("ESM-1b 650M", esm1b_baseline, "ESM-2 650M", SCORE_COLUMNS["ESM-2 650M"]),
+    ]:
+        rows.append(
+            {
+                "baseline_scorer": baseline_name,
+                "added_scorer": scorer,
+                "pearson_r": float(score_df[baseline_col].corr(score_df[col], method="pearson")),
+                "spearman_rho": float(score_df[baseline_col].corr(score_df[col], method="spearman")),
+            }
+        )
+    out = pd.DataFrame(rows)
+    out.to_csv(OUT_DIR / "model_control_added_scorer_correlation_audit.csv", index=False)
+
+    focused = (
+        out[out["baseline_scorer"].eq("ESM-2 650M")]
+        .assign(
+            scorer_modality=lambda x: np.where(
+                x["added_scorer"].eq("CaLM"), "codon-level LM", "protein LM"
+            ),
+            control_role=lambda x: x["added_scorer"].map(
+                {
+                    "ESM-2 150M": "weak PLM placeholder",
+                    "ESM-1b 650M": "strong PLM placeholder",
+                    "CaLM": "cross-modal codon scorer",
+                }
+            ),
+            n_variants=int(len(score_df)),
+        )
+        .sort_values("spearman_rho", ascending=False)
+        .reset_index(drop=True)
+    )
+    focused.insert(0, "redundancy_rank", np.arange(1, len(focused) + 1))
+    focused.to_csv(OUT_DIR / "supp_table_model_control_scorer_correlations.csv", index=False)
+    return out
+
+
+def same_modality_placeholder_control(gene_folds: pd.DataFrame) -> pd.DataFrame:
+    wide = gene_folds.pivot(index="fold", columns="model", values="test_auc")
+    baseline = "ESM-2 650M"
+    weak_placeholder = "ESM-2 150M + ESM-2 650M"
+    strong_placeholder_baseline = "ESM-1b 650M"
+    strong_placeholder = "ESM-2 650M + ESM-1b 650M"
+    calm = "ESM-2 650M + CaLM"
+    out = pd.DataFrame(
+        {
+            "fold": wide.index,
+            "esm2_650m_auc": wide[baseline].to_numpy(float),
+            "weak_same_modality_placeholder_auc": wide[weak_placeholder].to_numpy(float),
+            "esm1b_650m_auc": wide[strong_placeholder_baseline].to_numpy(float),
+            "strong_same_modality_placeholder_auc": wide[strong_placeholder].to_numpy(float),
+            "esm2_650m_plus_calm_auc": wide[calm].to_numpy(float),
+        }
+    )
+    out["weak_same_modality_placeholder_gain"] = (
+        out["weak_same_modality_placeholder_auc"] - out["esm2_650m_auc"]
+    )
+    out["strong_same_modality_placeholder_gain"] = (
+        out["strong_same_modality_placeholder_auc"] - out["esm1b_650m_auc"]
+    )
+    out["calm_gain"] = out["esm2_650m_plus_calm_auc"] - out["esm2_650m_auc"]
+    out["calm_minus_weak_placeholder_gain"] = (
+        out["calm_gain"] - out["weak_same_modality_placeholder_gain"]
+    )
+    out["calm_minus_strong_placeholder_gain"] = (
+        out["calm_gain"] - out["strong_same_modality_placeholder_gain"]
+    )
+    out.to_csv(OUT_DIR / "model_control_same_modality_placeholder_fold_deltas.csv", index=False)
+
+    try:
+        wilcoxon_weak_p = float(wilcoxon(out["calm_minus_weak_placeholder_gain"]).pvalue)
+    except ValueError:
+        wilcoxon_weak_p = np.nan
+    try:
+        wilcoxon_strong_p = float(wilcoxon(out["calm_minus_strong_placeholder_gain"]).pvalue)
+    except ValueError:
+        wilcoxon_strong_p = np.nan
+    summary = pd.DataFrame(
+        [
+            {
+                "n_folds": int(len(out)),
+                "mean_esm2_650m_auc": float(out["esm2_650m_auc"].mean()),
+                "mean_weak_same_modality_placeholder_auc": float(
+                    out["weak_same_modality_placeholder_auc"].mean()
+                ),
+                "mean_esm1b_650m_auc": float(out["esm1b_650m_auc"].mean()),
+                "mean_strong_same_modality_placeholder_auc": float(
+                    out["strong_same_modality_placeholder_auc"].mean()
+                ),
+                "mean_esm2_650m_plus_calm_auc": float(
+                    out["esm2_650m_plus_calm_auc"].mean()
+                ),
+                "mean_weak_same_modality_placeholder_gain": float(
+                    out["weak_same_modality_placeholder_gain"].mean()
+                ),
+                "sd_weak_same_modality_placeholder_gain": float(
+                    out["weak_same_modality_placeholder_gain"].std(ddof=1)
+                ),
+                "mean_strong_same_modality_placeholder_gain": float(
+                    out["strong_same_modality_placeholder_gain"].mean()
+                ),
+                "sd_strong_same_modality_placeholder_gain": float(
+                    out["strong_same_modality_placeholder_gain"].std(ddof=1)
+                ),
+                "mean_calm_gain": float(out["calm_gain"].mean()),
+                "sd_calm_gain": float(out["calm_gain"].std(ddof=1)),
+                "mean_calm_minus_weak_placeholder_gain": float(
+                    out["calm_minus_weak_placeholder_gain"].mean()
+                ),
+                "sd_calm_minus_weak_placeholder_gain": float(
+                    out["calm_minus_weak_placeholder_gain"].std(ddof=1)
+                ),
+                "mean_calm_minus_strong_placeholder_gain": float(
+                    out["calm_minus_strong_placeholder_gain"].mean()
+                ),
+                "sd_calm_minus_strong_placeholder_gain": float(
+                    out["calm_minus_strong_placeholder_gain"].std(ddof=1)
+                ),
+                "paired_t_p_calm_gain_vs_weak_placeholder_gain": float(
+                    ttest_rel(out["calm_gain"], out["weak_same_modality_placeholder_gain"]).pvalue
+                ),
+                "wilcoxon_p_calm_gain_vs_weak_placeholder_gain": wilcoxon_weak_p,
+                "paired_t_p_calm_gain_vs_strong_placeholder_gain": float(
+                    ttest_rel(out["calm_gain"], out["strong_same_modality_placeholder_gain"]).pvalue
+                ),
+                "wilcoxon_p_calm_gain_vs_strong_placeholder_gain": wilcoxon_strong_p,
+                "fraction_folds_calm_gain_exceeds_weak_placeholder_gain": float(
+                    (out["calm_gain"] > out["weak_same_modality_placeholder_gain"]).mean()
+                ),
+                "fraction_folds_calm_gain_exceeds_strong_placeholder_gain": float(
+                    (out["calm_gain"] > out["strong_same_modality_placeholder_gain"]).mean()
+                ),
+            }
+        ]
+    )
+    summary.to_csv(OUT_DIR / "model_control_same_modality_placeholder_summary.csv", index=False)
+    return out
+
+
+def plot_same_modality_placeholder_control(placeholder_df: pd.DataFrame) -> None:
+    fig, axes = plt.subplots(1, 2, figsize=(6.75, 2.7), gridspec_kw={"width_ratios": [1.2, 1.15]})
+    ax = axes[0]
+    x = np.array([0, 1, 2])
+    rng = np.random.default_rng(11)
+    for _, row in placeholder_df.iterrows():
+        vals = [
+            row["weak_same_modality_placeholder_gain"],
+            row["strong_same_modality_placeholder_gain"],
+            row["calm_gain"],
+        ]
+        jitter = rng.normal(0, 0.018, size=3)
+        ax.plot(x + jitter, vals, color="#B8B8B2", linewidth=0.7, zorder=1)
+        ax.scatter(
+            x + jitter,
+            vals,
+            s=22,
+            color=[COLORS["grey"], COLORS["yellow"], COLORS["green"]],
+            edgecolor=COLORS["edge"],
+            linewidth=0.45,
+            zorder=3,
+        )
+    means = [
+        placeholder_df["weak_same_modality_placeholder_gain"].mean(),
+        placeholder_df["strong_same_modality_placeholder_gain"].mean(),
+        placeholder_df["calm_gain"].mean(),
+    ]
+    ax.scatter(x, means, s=34, color=COLORS["text"], zorder=4)
+    ax.axhline(0, color="#9B9B96", linewidth=0.8, linestyle=(0, (3, 2)))
+    ax.set_xticks(x)
+    ax.set_xticklabels(["Weak PLM\nplaceholder", "Strong PLM\nplaceholder", "CaLM"])
+    ax.set_ylabel("Fold-level gain over matched PLM baseline")
+    ax.set_xlim(-0.38, 2.38)
+    ax.text(-0.13, 1.04, "A", transform=ax.transAxes, fontsize=9, fontweight="bold", va="bottom")
+    format_ax(ax)
+
+    ax = axes[1]
+    diff_specs = [
+        ("CaLM - weak", "calm_minus_weak_placeholder_gain", COLORS["teal"], 0.13),
+        ("CaLM - strong", "calm_minus_strong_placeholder_gain", COLORS["yellow"], -0.13),
+    ]
+    for label, col, color, y_center in diff_specs:
+        vals = placeholder_df[col].to_numpy(float)
+        y = np.full_like(vals, y_center, dtype=float) + rng.normal(0, 0.024, size=len(vals))
+        ax.scatter(vals, y, s=24, color=color, edgecolor=COLORS["edge"], linewidth=0.45, zorder=3, label=label)
+        mean = vals.mean()
+        sd = vals.std(ddof=1)
+        ax.errorbar(mean, y_center, xerr=sd, fmt="o", color=COLORS["text"], markersize=3.8, capsize=4, linewidth=0.9, zorder=4)
+    ax.axvline(0, color="#9B9B96", linewidth=0.8, linestyle=(0, (3, 2)))
+    ax.set_yticks([0.13, -0.13])
+    ax.set_yticklabels(["CaLM - weak", "CaLM - strong"])
+    ax.set_xlabel("Gain difference (ΔAUROC)")
+    ax.set_ylim(-0.36, 0.36)
+    ax.text(-0.11, 1.04, "B", transform=ax.transAxes, fontsize=9, fontweight="bold", va="bottom")
+    format_ax(ax)
+
+    fig.tight_layout(w_pad=1.35)
     fig.savefig(FIG_DIR / "figS1.png", dpi=600, bbox_inches="tight")
     plt.close(fig)
 
@@ -342,7 +574,7 @@ def plot_cv_comparison(gene_folds: pd.DataFrame, variant_folds: pd.DataFrame) ->
     )
     format_ax(ax)
     fig.subplots_adjust(bottom=0.205, top=0.98, left=0.075, right=0.995)
-    fig.savefig(FIG_DIR / "figS2.png", dpi=600, bbox_inches="tight")
+    fig.savefig(FIG_DIR / "figS3.png", dpi=600, bbox_inches="tight")
     plt.close(fig)
     return out
 
@@ -390,7 +622,7 @@ def plot_weight_distribution(gene_folds: pd.DataFrame) -> None:
     axes[0, 0].set_ylabel("Optimized weight")
     axes[1, 0].set_ylabel("Optimized weight")
     fig.tight_layout(w_pad=0.65, h_pad=0.85)
-    fig.savefig(FIG_DIR / "figS3.png", dpi=600, bbox_inches="tight")
+    fig.savefig(FIG_DIR / "figS4.png", dpi=600, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -404,6 +636,8 @@ def main() -> None:
 
     all_pairwise = all_pairwise_tests(gene_folds)
     all_pairwise.to_csv(OUT_DIR / "supp_table_model_control_all_pairwise_tests.csv", index=False)
+    score_correlation = write_score_correlation_audit(score_df)
+    placeholder_df = same_modality_placeholder_control(gene_folds)
 
     variant_fold_path = OUT_DIR / "model_control_variantwise_fold_results.csv"
     if variant_fold_path.exists():
@@ -414,14 +648,21 @@ def main() -> None:
 
     cv_comparison = plot_cv_comparison(gene_folds, variant_folds)
     plot_fold_delta_distribution(gene_folds)
+    plot_same_modality_placeholder_control(placeholder_df)
     plot_weight_distribution(gene_folds)
 
     print(OUT_DIR / "supp_table_model_control_all_pairwise_tests.csv")
+    print(OUT_DIR / "model_control_added_scorer_correlation_audit.csv")
+    print(OUT_DIR / "supp_table_model_control_scorer_correlations.csv")
+    print(OUT_DIR / "model_control_same_modality_placeholder_fold_deltas.csv")
+    print(OUT_DIR / "model_control_same_modality_placeholder_summary.csv")
     print(OUT_DIR / "supp_table_model_control_gene_vs_variantwise_cv.csv")
     print(OUT_DIR / "supp_table_model_control_fold_weight_summary.csv")
-    print(FIG_DIR / "figS1.png")
     print(FIG_DIR / "figS2.png")
     print(FIG_DIR / "figS3.png")
+    print(FIG_DIR / "figS4.png")
+    print(FIG_DIR / "figS1.png")
+    print(score_correlation.to_string(index=False))
     print(cv_comparison[["model", "gene_wise_mean_auc", "variant_wise_mean_auc", "variant_minus_gene_mean_auc"]].to_string(index=False))
 
 
