@@ -175,7 +175,7 @@ def add_model_comparison_bracket(
     y = 0.952 + level * 0.010
     h = 0.0025
     ax.plot([low, low, high, high], [y, y + h, y + h, y], color=DARK_EDGE, linewidth=0.72, clip_on=False)
-    ax.text((low + high) / 2, y + h + 0.0012, rf"$\Delta=+{delta:.3f}$", ha="center", va="bottom", fontsize=6.3)
+    ax.text((low + high) / 2, y + h + 0.0012, rf"$\Delta=+{delta:.4f}$", ha="center", va="bottom", fontsize=6.3)
 
 
 def plot_auroc_panel(ax, summary: pd.DataFrame, folds: pd.DataFrame, paired: pd.DataFrame) -> None:

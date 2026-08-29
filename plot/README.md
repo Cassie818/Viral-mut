@@ -8,7 +8,7 @@ They do not generate PDF duplicates.
 
 Supplementary script mapping:
 
-- `s1_s4.py`: same-modality placeholder control, model-control fold gains, cross-validation comparison, and ensemble weights
+- `s1_s4.py`: model-control fold gains, cross-validation comparison, same-modality placeholder control, and ensemble weights
 - `s5.py`: mutational-context conditional gains
 - `s6_s7.py`: ClinMAVE GoF fold gains and optimised weights
 - `s8.py`: amino-acid probability-alignment control

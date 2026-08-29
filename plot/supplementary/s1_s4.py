@@ -4,8 +4,8 @@
 Outputs:
 - all pairwise fold-level statistics, including non-significant comparisons
 - fold-level delta AUROC distributions for planned contrasts
-- same-modality placeholder control for generic ensembling
 - gene-wise versus variant-wise CV comparison
+- same-modality placeholder control for generic ensembling
 - per-fold ensemble-weight distributions
 """
 
@@ -298,7 +298,7 @@ def plot_fold_delta_distribution(gene_folds: pd.DataFrame) -> None:
     ax.set_xlabel("Fold-level ΔAUROC")
     format_ax(ax)
     fig.tight_layout()
-    fig.savefig(FIG_DIR / "figS2.png", dpi=600, bbox_inches="tight")
+    fig.savefig(FIG_DIR / "figS1.png", dpi=600, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -505,7 +505,7 @@ def plot_same_modality_placeholder_control(placeholder_df: pd.DataFrame) -> None
     format_ax(ax)
 
     fig.tight_layout(w_pad=1.35)
-    fig.savefig(FIG_DIR / "figS1.png", dpi=600, bbox_inches="tight")
+    fig.savefig(FIG_DIR / "figS3.png", dpi=600, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -574,7 +574,7 @@ def plot_cv_comparison(gene_folds: pd.DataFrame, variant_folds: pd.DataFrame) ->
     )
     format_ax(ax)
     fig.subplots_adjust(bottom=0.205, top=0.98, left=0.075, right=0.995)
-    fig.savefig(FIG_DIR / "figS3.png", dpi=600, bbox_inches="tight")
+    fig.savefig(FIG_DIR / "figS2.png", dpi=600, bbox_inches="tight")
     plt.close(fig)
     return out
 
@@ -658,10 +658,10 @@ def main() -> None:
     print(OUT_DIR / "model_control_same_modality_placeholder_summary.csv")
     print(OUT_DIR / "supp_table_model_control_gene_vs_variantwise_cv.csv")
     print(OUT_DIR / "supp_table_model_control_fold_weight_summary.csv")
-    print(FIG_DIR / "figS2.png")
-    print(FIG_DIR / "figS3.png")
-    print(FIG_DIR / "figS4.png")
     print(FIG_DIR / "figS1.png")
+    print(FIG_DIR / "figS2.png")
+    print(FIG_DIR / "figS4.png")
+    print(FIG_DIR / "figS3.png")
     print(score_correlation.to_string(index=False))
     print(cv_comparison[["model", "gene_wise_mean_auc", "variant_wise_mean_auc", "variant_minus_gene_mean_auc"]].to_string(index=False))
 
