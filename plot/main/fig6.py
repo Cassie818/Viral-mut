@@ -30,7 +30,7 @@ GENE_POINT = "#A9BEC6"
 GENE_LINE = "#5F5F5B"
 LOWESS_LINE = "#9FCFB7"
 SAGE = "#C7DCC1"
-YELLOW = "#E9DFA7"
+YELLOW = "#F3EBC4"
 LILAC = "#D8CAE8"
 TEAL = "#A9D8D1"
 
@@ -106,6 +106,7 @@ def scatter_with_fit(
     color: str,
     stat_mode: str = "ols",
     show_lowess: bool = False,
+    show_stats: bool = True,
 ) -> None:
     reg = df.dropna(subset=[x_col, y_col, "n"]).copy()
     size = np.clip(np.sqrt(reg["n"].to_numpy(float)) * 4.2, 10, 48)
@@ -143,17 +144,18 @@ def scatter_with_fit(
         note = rf"$\rho={rho:.2f}$" + "\n" + p_math(float(rho_p)) + "\n" + rf"$\beta_{{OLS}}={slope:.3f}$"
     else:
         note = rf"$\beta={slope:.3f}$" + "\n" + p_math(float(pval)) + "\n" + rf"$R^2={r2:.2f}$"
-    ax.text(
-        0.03,
-        0.96,
-        note,
-        transform=ax.transAxes,
-        ha="left",
-        va="top",
-        fontsize=7.2,
-        color=TEXT,
-        bbox=dict(boxstyle="round,pad=0.18", facecolor=(1, 1, 1, 0.78), edgecolor="none"),
-    )
+    if show_stats:
+        ax.text(
+            0.03,
+            0.96,
+            note,
+            transform=ax.transAxes,
+            ha="left",
+            va="top",
+            fontsize=7.2,
+            color=TEXT,
+            bbox=dict(boxstyle="round,pad=0.18", facecolor=(1, 1, 1, 0.78), edgecolor="none"),
+        )
     format_ax(ax, "both")
 
 
@@ -271,6 +273,7 @@ def top_gene_bar_panel(
     bar_left: float = 0.0,
     label_inside: bool = False,
     show_n: bool = True,
+    show_values: bool = True,
 ) -> None:
     top = df.sort_values(metric, ascending=False).head(n).iloc[::-1].copy()
     y = np.arange(len(top))
@@ -279,7 +282,7 @@ def top_gene_bar_panel(
         y,
         widths,
         left=bar_left,
-        color=BAR_BLUE,
+        color=YELLOW,
         edgecolor=EDGE,
         linewidth=0.85,
         height=0.66,
@@ -295,22 +298,23 @@ def top_gene_bar_panel(
     else:
         ax.set_xlim(*xlim)
         label_offset = (xlim[1] - xlim[0]) * 0.018
-    for yi, (_, row) in zip(y, top.iterrows()):
-        if label_inside:
-            x_text = float(row[metric]) - label_offset
-            ha = "right"
-        else:
-            x_text = float(row[metric]) + label_offset
-            ha = "left"
-        ax.text(
-            x_text,
-            yi,
-            f"{fmt.format(row[metric])}" + (f"  n={int(row['n'])}" if show_n else ""),
-            va="center",
-            ha=ha,
-            fontsize=6.8,
-            color="#5F5F5A",
-        )
+    if show_values:
+        for yi, (_, row) in zip(y, top.iterrows()):
+            if label_inside:
+                x_text = float(row[metric]) - label_offset
+                ha = "right"
+            else:
+                x_text = float(row[metric]) + label_offset
+                ha = "left"
+            ax.text(
+                x_text,
+                yi,
+                f"{fmt.format(row[metric])}" + (f"  n={int(row['n'])}" if show_n else ""),
+                va="center",
+                ha=ha,
+                fontsize=6.8,
+                color="#5F5F5A",
+            )
     format_ax(ax, "x")
 
 
@@ -457,9 +461,10 @@ def main() -> None:
         df,
         "esm2_calm_weight",
         "esm2_cross_modal_gain",
-        "Mean CV-selected CaLM weight",
+        "Mean CaLM weight",
         r"$\Delta\mathrm{AUROC}_{+\mathrm{CaLM}}$",
         ROSE,
+        show_stats=False,
     )
     scatter_with_fit(
         ax_b,
@@ -471,6 +476,7 @@ def main() -> None:
         ROSE,
         stat_mode="spearman",
         show_lowess=True,
+        show_stats=False,
     )
     ax_a.set_ylim(-0.15, 0.30)
     ax_b.set_ylim(-0.15, 0.30)
@@ -486,6 +492,7 @@ def main() -> None:
         bar_left=0.0,
         label_inside=True,
         show_n=False,
+        show_values=True,
     )
     top_gene_bar_panel(
         ax_c2,
@@ -497,6 +504,7 @@ def main() -> None:
         n=10,
         bar_left=0.0,
         show_n=False,
+        show_values=True,
     )
 
     for ax, label in zip([ax_a, ax_b, ax_c1, ax_c2], list("ABCD")):

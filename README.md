@@ -25,7 +25,7 @@ analysis/               Statistical analyses and model-scoring code
   sensitivity/          Bayesian-optimisation sensitivity analyses
 plot/
   main/                 Main-figure scripts
-  supplementary/        Supplementary-figure scripts for Figs. S1--S10
+  supplementary/        Supplementary-figure scripts for Figs. S1--S9
 Figure/                 Final manuscript figures
 Results/                Final result tables
 ```
@@ -59,7 +59,6 @@ numbering:
 - `plot/supplementary/s6_s7.py`
 - `plot/supplementary/s8.py`
 - `plot/supplementary/s9.py`
-- `plot/supplementary/s10.py`
 
 Scoring utilities:
 

@@ -36,6 +36,8 @@ COLORS = {
     "650": "#E7D27A",
     "pos": "#79B3A6",
     "neg": "#D99C91",
+    "pos_edge": "#5F8F85",
+    "neg_edge": "#B87870",
     "neutral": "#8E9390",
     "line": "#C9CECB",
     "grid": "#ECEBE7",
@@ -88,9 +90,10 @@ def paired_panel(ax: plt.Axes, df: pd.DataFrame, model: str, color: str) -> None
         cbge = row["mean_calm_weight_CBGE"]
         delta = row["delta_CBGE_minus_DMS"]
         line_color = COLORS["pos"] if delta >= 0 else COLORS["neg"]
+        edge_color = COLORS["pos_edge"] if delta >= 0 else COLORS["neg_edge"]
         ax.plot(x, [dms, cbge], color=line_color, linewidth=0.8, alpha=0.52, zorder=1)
-        ax.scatter(0, dms, s=24, facecolor=line_color, edgecolor="white", linewidth=0.45, alpha=0.9, zorder=2)
-        ax.scatter(1, cbge, s=24, facecolor=line_color, edgecolor="white", linewidth=0.45, alpha=0.9, zorder=3)
+        ax.scatter(0, dms, s=26, facecolor=line_color, edgecolor=edge_color, linewidth=0.7, alpha=0.9, zorder=2)
+        ax.scatter(1, cbge, s=26, facecolor=line_color, edgecolor=edge_color, linewidth=0.7, alpha=0.9, zorder=3)
 
     ax.set_xlim(-0.28, 1.28)
     ax.set_ylim(-0.03, 1.03)
@@ -162,10 +165,11 @@ def baseline_sensitivity(ax: plt.Axes, df: pd.DataFrame) -> None:
         .reset_index()
         .dropna(subset=["150M", "650M"])
     )
+    sizes = 20 + np.clip(shared["n_variants"].to_numpy(float), 0, 250) * 0.12
     ax.scatter(
         shared["150M"],
         shared["650M"],
-        s=28,
+        s=sizes,
         facecolor="#B9D8E1",
         edgecolor="#6F8F99",
         linewidth=0.8,
@@ -181,8 +185,6 @@ def baseline_sensitivity(ax: plt.Axes, df: pd.DataFrame) -> None:
     ax.set_xlabel(r"$\Delta w$ with ESM-2 (150M)")
     ax.set_ylabel(r"$\Delta w$ with ESM-2 (650M)")
     style_ax(ax)
-    pearson_r = shared["150M"].corr(shared["650M"], method="pearson")
-    ax.text(0.05, 0.94, rf"$r={pearson_r:.2f}$", transform=ax.transAxes, ha="left", va="top", fontsize=8)
 
 
 
