@@ -82,6 +82,53 @@ def fit_spearman_and_top5_sensitivity(df: pd.DataFrame, x_col: str, y_col: str, 
     }
 
 
+def add_baseline_adjusted_analysis(
+    df: pd.DataFrame,
+    calm_col: str,
+    plm_col: str,
+    gain_col: str,
+    prefix: str,
+) -> tuple[pd.DataFrame, dict[str, object]]:
+    """Add partial-regression coordinates and fit gain adjusting for PLM AUROC."""
+    out = df.copy()
+    required = [calm_col, plm_col, gain_col]
+    reg_df = out.dropna(subset=required).copy()
+
+    control = sm.add_constant(reg_df[[plm_col]], has_constant="add")
+    calm_residual = sm.OLS(reg_df[calm_col], control).fit().resid
+    gain_residual = sm.OLS(reg_df[gain_col], control).fit().resid
+    out[f"{prefix}_calm_auroc_residual"] = np.nan
+    out[f"{prefix}_gain_residual"] = np.nan
+    out.loc[reg_df.index, f"{prefix}_calm_auroc_residual"] = calm_residual
+    out.loc[reg_df.index, f"{prefix}_gain_residual"] = gain_residual
+
+    full_x = sm.add_constant(reg_df[[calm_col, plm_col]], has_constant="add")
+    full_model = sm.OLS(reg_df[gain_col], full_x).fit(cov_type="HC3")
+    reduced_model = sm.OLS(reg_df[gain_col], control).fit()
+    full_model_nonrobust = sm.OLS(reg_df[gain_col], full_x).fit()
+    partial_r_squared = 1.0 - (
+        np.sum(full_model_nonrobust.resid**2) / np.sum(reduced_model.resid**2)
+    )
+    ci_low, ci_high = full_model.conf_int(alpha=0.05).loc[calm_col]
+    result = {
+        "analysis": f"{prefix}_calm_auroc_predicts_gain_adjusting_for_plm_auroc",
+        "method": "multiple_OLS_HC3",
+        "n_genes": int(len(reg_df)),
+        "outcome": gain_col,
+        "predictor": calm_col,
+        "covariate": plm_col,
+        "calm_coefficient": float(full_model.params[calm_col]),
+        "calm_95ci_low": float(ci_low),
+        "calm_95ci_high": float(ci_high),
+        "calm_p_value": float(full_model.pvalues[calm_col]),
+        "plm_coefficient": float(full_model.params[plm_col]),
+        "plm_p_value": float(full_model.pvalues[plm_col]),
+        "model_r_squared": float(full_model.rsquared),
+        "partial_r_squared_calm": float(partial_r_squared),
+    }
+    return out, result
+
+
 def add_rankings(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
     out["esm2_calm_weight"] = out["ESM-2 650M + CaLM weight_second"]
@@ -209,7 +256,33 @@ def main() -> None:
     if nested_fold_path.exists():
         pd.read_csv(nested_fold_path).to_csv(OUT_DIR / "gene_level_nested_cv_fold_metrics.csv", index=False)
     ranked = add_rankings(per_gene)
+    ranked, baseline_adjusted = add_baseline_adjusted_analysis(
+        ranked,
+        "CaLM AUROC",
+        "ESM-2 650M AUROC",
+        "esm2_cross_modal_gain",
+        "esm2",
+    )
+    ranked, esm1b_baseline_adjusted = add_baseline_adjusted_analysis(
+        ranked,
+        "CaLM AUROC",
+        "ESM-1b 650M AUROC",
+        "esm1b_gain_over_protein",
+        "esm1b",
+    )
+    ranked, plm_control_baseline_adjusted = add_baseline_adjusted_analysis(
+        ranked,
+        "CaLM AUROC",
+        "ESM-2 150M + 650M AUROC",
+        "esm2_cross_modal_advantage",
+        "esm2_plm_control",
+    )
     ranked.to_csv(OUT_DIR / "gene_level_codon_contribution_summary.csv", index=False)
+    pd.DataFrame(
+        [baseline_adjusted, esm1b_baseline_adjusted, plm_control_baseline_adjusted]
+    ).to_csv(
+        OUT_DIR / "gene_level_baseline_adjusted_regression.csv", index=False
+    )
 
     regressions = pd.DataFrame(
         [

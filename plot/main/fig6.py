@@ -9,7 +9,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
 from scipy.stats import spearmanr
 from statsmodels.nonparametric.smoothers_lowess import lowess
 import statsmodels.api as sm
@@ -60,7 +59,7 @@ def format_ax(ax: plt.Axes, grid_axis: str | None = "y") -> None:
 
 def add_label(ax: plt.Axes, label: str) -> None:
     ax.text(
-        -0.13,
+        -0.16,
         1.04,
         label,
         transform=ax.transAxes,
@@ -461,7 +460,7 @@ def main() -> None:
         df,
         "esm2_calm_weight",
         "esm2_cross_modal_gain",
-        "Mean CaLM weight",
+        r"$\bar{w}_g$",
         r"$\Delta\mathrm{AUROC}_{+\mathrm{CaLM}}$",
         ROSE,
         show_stats=False,
@@ -469,15 +468,14 @@ def main() -> None:
     scatter_with_fit(
         ax_b,
         df,
-        "esm2_independent_calm_signal",
-        "esm2_cross_modal_gain",
-        r"$\Delta\mathrm{AUROC}_{\mathrm{single}}$",
-        r"$\Delta\mathrm{AUROC}_{+\mathrm{CaLM}}$",
+        "esm2_calm_auroc_residual",
+        "esm2_gain_residual",
+        r"$r_{\mathrm{CaLM},g}$",
+        r"$r_{\mathrm{gain},g}$",
         ROSE,
-        stat_mode="spearman",
-        show_lowess=True,
         show_stats=False,
     )
+    ax_b.axvline(0, color="#BDBDB8", linewidth=0.8, linestyle=(0, (3, 2)))
     ax_a.set_ylim(-0.15, 0.30)
     ax_b.set_ylim(-0.15, 0.30)
     top_gene_bar_panel(
@@ -485,7 +483,7 @@ def main() -> None:
         df,
         "esm2_calm_weight",
         "Top genes by CaLM weight",
-        "Mean CV-selected CaLM weight",
+        r"$\bar{w}_g$",
         "{:.2f}",
         n=10,
         xlim=(0, 1.02),
@@ -510,17 +508,6 @@ def main() -> None:
     for ax, label in zip([ax_a, ax_b, ax_c1, ax_c2], list("ABCD")):
         add_label(ax, label)
 
-    ax_b.legend(
-        handles=[
-            Line2D([0], [0], color=GENE_LINE, linewidth=0.85, linestyle="-", label="OLS"),
-            Line2D([0], [0], color=LOWESS_LINE, linewidth=1.05, linestyle=(0, (4, 2)), label="LOWESS"),
-        ],
-        loc="lower right",
-        frameon=False,
-        fontsize=7.0,
-        handlelength=2.2,
-        borderaxespad=0.6,
-    )
     fig.subplots_adjust(left=0.095, right=0.985, top=0.965, bottom=0.075)
 
     output_path = FIG_DIR / "fig6.png"
