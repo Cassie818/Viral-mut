@@ -8,7 +8,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from scipy import stats
 
 
 BASE = Path("Results/ClinMAVE/functional_effects")
@@ -27,6 +26,7 @@ FOLD_FILES = {
     "ESM-2 (650M)": BASE / "clinmave_esm2_650m_calm_cv_fold_metrics.csv",
     "ESM-1b (650M)": BASE / "clinmave_esm1b_650m_calm_cv_fold_metrics.csv",
 }
+BOOTSTRAP_FILE = BASE / "clinmave_functional_class_gene_bootstrap.csv"
 
 MODELS = ["ESM-2 (650M)", "ESM-1b (650M)"]
 GROUPS = [
@@ -44,7 +44,7 @@ DARK = "#383838"
 LIGHT_EDGE = "#A7A7A7"
 
 
-def load_data() -> tuple[pd.DataFrame, pd.DataFrame]:
+def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     summaries = []
     folds = []
     for model, path in SUMMARY_FILES.items():
@@ -55,7 +55,11 @@ def load_data() -> tuple[pd.DataFrame, pd.DataFrame]:
         df = pd.read_csv(path)
         df["model"] = model
         folds.append(df)
-    return pd.concat(summaries, ignore_index=True), pd.concat(folds, ignore_index=True)
+    return (
+        pd.concat(summaries, ignore_index=True),
+        pd.concat(folds, ignore_index=True),
+        pd.read_csv(BOOTSTRAP_FILE),
+    )
 
 
 def row_for(summary: pd.DataFrame, model: str, assay: str, case_class: str) -> pd.Series:
@@ -107,31 +111,24 @@ def metric_columns(model: str) -> tuple[str, str, str]:
     )
 
 
-def fold_delta_ci(folds: pd.DataFrame, model: str, assay: str, case_class: str) -> tuple[float, bool]:
-    if model == "ESM-2 (650M)":
-        col = "delta_combo_vs_esm2_650m"
-    else:
-        col = "delta_combo_vs_esm1b_650m"
-    sub = folds[
-        (folds["model"] == model)
-        & (folds["assay"] == assay)
-        & (folds["case_class"] == case_class)
-    ][col].dropna()
-    if len(sub) < 2:
-        return np.nan, True
-    mean = sub.mean()
-    sem = stats.sem(sub)
-    ci_half = stats.t.ppf(0.975, len(sub) - 1) * sem
-    return ci_half, (mean - ci_half <= 0 <= mean + ci_half)
-
-
-def collect_plot_rows(summary: pd.DataFrame, folds: pd.DataFrame) -> pd.DataFrame:
+def collect_plot_rows(
+    summary: pd.DataFrame, folds: pd.DataFrame, bootstrap: pd.DataFrame
+) -> pd.DataFrame:
     rows = []
     for group_index, (assay, case_class, group_label) in enumerate(GROUPS):
         for model in MODELS:
             row = row_for(summary, model, assay, case_class)
             delta_mean, delta_sd, delta_p = metric_columns(model)
-            delta_ci_half, delta_ci_crosses_zero = fold_delta_ci(folds, model, assay, case_class)
+            boot = bootstrap[
+                (bootstrap["plm_background"] == model)
+                & (bootstrap["assay"] == assay)
+                & (bootstrap["case_class"] == case_class)
+            ]
+            if len(boot) != 1:
+                raise ValueError(
+                    f"Expected one bootstrap row for {model} {assay} {case_class}, got {len(boot)}"
+                )
+            boot = boot.iloc[0]
             rows.append(
                 {
                     "group_index": group_index,
@@ -141,10 +138,11 @@ def collect_plot_rows(summary: pd.DataFrame, folds: pd.DataFrame) -> pd.DataFram
                     "model": model,
                     "mean_calm_weight": row["mean_calm_weight"],
                     "sd_calm_weight": row["sd_calm_weight"],
-                    "delta_auroc_vs_plm": row[delta_mean],
+                    "delta_auroc_vs_plm": boot["pooled_oof_delta_auroc"],
                     "sd_delta_auroc_vs_plm": row[delta_sd],
-                    "ci95_delta_auroc_vs_plm": delta_ci_half,
-                    "ci95_delta_crosses_zero": delta_ci_crosses_zero,
+                    "ci95_delta_low": boot["bootstrap_95ci_low"],
+                    "ci95_delta_high": boot["bootstrap_95ci_high"],
+                    "ci95_delta_crosses_zero": not bool(boot["ci_excludes_zero"]),
                     "p_delta_auroc_vs_plm": row[delta_p],
                     "n_folds": int(row["n_folds"]),
                     "n_evaluable_folds": int(row["n_evaluable_folds"]),
@@ -174,7 +172,14 @@ def draw_bars(
         sub = plot_df[plot_df["model"] == model].sort_values("group_index")
         xs = x + offsets[model]
         vals = sub[metric_col].to_numpy(float)
-        errs = sub[sd_col].to_numpy(float)
+        if metric_col == "delta_auroc_vs_plm":
+            lows = sub["ci95_delta_low"].to_numpy(float)
+            highs = sub["ci95_delta_high"].to_numpy(float)
+            errs = np.vstack([vals - lows, highs - vals])
+            upper_errs = highs - vals
+        else:
+            errs = sub[sd_col].to_numpy(float)
+            upper_errs = errs
         bars = ax.bar(
             xs,
             vals,
@@ -192,7 +197,7 @@ def draw_bars(
         for bar, val, err, group_index, n_eval, n_folds in zip(
             bars,
             vals,
-            errs,
+            upper_errs,
             sub["group_index"].astype(int),
             sub["n_evaluable_folds"].astype(int),
             sub["n_folds"].astype(int),
@@ -200,7 +205,7 @@ def draw_bars(
             if metric_col == "delta_auroc_vs_plm":
                 va = "bottom" if val >= 0 else "top"
                 y = val + err + 0.006 if val >= 0 else val - 0.007
-                fontsize = 7.0
+                fontsize = 6.4
                 if group_index == 3 and val < 0:
                     y = -0.026 if model == "ESM-2 (650M)" else -0.011
             else:
@@ -240,8 +245,8 @@ def draw_bars(
 
 def main() -> None:
     FIG_DIR.mkdir(parents=True, exist_ok=True)
-    summary, folds = load_data()
-    plot_df = collect_plot_rows(summary, folds)
+    summary, folds, bootstrap = load_data()
+    plot_df = collect_plot_rows(summary, folds, bootstrap)
     plot_df.to_csv(BASE / "fig3_plot_data.csv", index=False)
 
     plt.rcParams.update(

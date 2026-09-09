@@ -16,11 +16,10 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn.functional as F
-import matplotlib.pyplot as plt
 import statsmodels.api as sm
 from calm import CaLM
 from calm.sequence import CodonSequence
-from scipy.stats import fisher_exact
+from scipy.stats import fisher_exact, pearsonr, spearmanr
 from sklearn.metrics import roc_auc_score
 from statsmodels.stats.multitest import multipletests
 
@@ -31,8 +30,7 @@ DEFAULT_INPUT = Path(
 )
 DEFAULT_WEIGHTS = Path("/Users/cassie/Desktop/genome-protein-mut/CaLM/calm/calm_weights/calm_weights.ckpt")
 DEFAULT_GENE_DIR = Path("/Users/cassie/Desktop/Gene")
-DEFAULT_OUT_DIR = Path("Results/Revision/len1022_aa_aggregation")
-FIG_DIR = Path("Figure")
+DEFAULT_OUT_DIR = Path("Results/ClinVar/substitution_discordance")
 
 AA_TO_CODONS = {
     "K": ["AAA", "AAG"],
@@ -287,7 +285,7 @@ def degeneracy_logit(df: pd.DataFrame, flag_col: str) -> pd.Series:
     )
 
 
-def analyze(scored: pd.DataFrame, out_dir: Path, fig_prefix: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+def analyze(scored: pd.DataFrame, out_dir: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
     df = add_labels_and_scores(scored)
     protein_model = str(df["protein_model_for_fig5"].iloc[0])
     aurocs = {
@@ -382,93 +380,30 @@ def analyze(scored: pd.DataFrame, out_dir: Path, fig_prefix: str) -> tuple[pd.Da
     )
 
     scored_with_flags = df.drop(columns=["Pair"])
-    scored_with_flags.to_csv(out_dir / "calm_aa_aggregation_variant_scores_with_flags.csv", index=False)
-    scored_with_flags.to_csv(out_dir / "len1022_calm_aa_aggregation_variant_scores_with_flags.csv", index=False)
-    summary.to_csv(out_dir / "calm_aa_aggregation_control_summary.csv", index=False)
-    summary.to_csv(out_dir / "len1022_calm_aa_aggregation_control_summary.csv", index=False)
-    pair_all.to_csv(out_dir / "calm_aa_aggregation_pair_enrichment.csv", index=False)
-    pair_all.to_csv(out_dir / "len1022_calm_aa_aggregation_pair_enrichment.csv", index=False)
-    degeneracy.to_csv(out_dir / "calm_aa_aggregation_degeneracy_logit.csv", index=False)
-    degeneracy.to_csv(out_dir / "len1022_calm_aa_aggregation_degeneracy_logit.csv", index=False)
-    comparison.to_csv(out_dir / "len1022_calm_aa_aggregation_discordance_model_comparison.csv", index=False)
-    plot_control(summary, degeneracy, fig_prefix)
+    scored_with_flags.to_csv(
+        out_dir / "variant_discordance_scores.csv.gz", index=False, compression="gzip"
+    )
+    summary.to_csv(out_dir / "discordance_summary.csv", index=False)
+    pair_all.to_csv(out_dir / "pair_enrichment_all_spaces.csv", index=False)
+    pair_all.loc[pair_all["space"] == "aa_aggregated"].to_csv(
+        out_dir / "pair_enrichment_esm2_650m_aa_aggregated.csv", index=False
+    )
+    degeneracy.to_csv(out_dir / "degeneracy_logit.csv", index=False)
+    comparison.to_csv(out_dir / "discordance_model_comparison.csv", index=False)
+    pearson = pearsonr(df["diff_codon"], df["diff_aa_agg"])
+    spearman = spearmanr(df["diff_codon"], df["diff_aa_agg"])
+    pd.DataFrame(
+        [
+            {
+                "n_variants": len(df),
+                "pearson_r": pearson.statistic,
+                "pearson_p": pearson.pvalue,
+                "spearman_rho": spearman.statistic,
+                "spearman_p": spearman.pvalue,
+            }
+        ]
+    ).to_csv(out_dir / "discordance_probability_space_correlations.csv", index=False)
     return summary, degeneracy
-
-
-def plot_control(summary: pd.DataFrame, degeneracy: pd.DataFrame, fig_prefix: str) -> None:
-    plt.rcParams.update(
-        {
-            "font.family": "Arial",
-            "font.size": 9,
-            "axes.labelsize": 10,
-            "axes.titlesize": 11,
-            "xtick.labelsize": 9,
-            "ytick.labelsize": 9,
-            "ps.fonttype": 42,
-        }
-    )
-    fig, axes = plt.subplots(1, 2, figsize=(7.0, 2.8), gridspec_kw={"width_ratios": [1, 1.15]})
-
-    auroc_values = [
-        summary["auroc_protein"].iloc[0],
-        summary["auroc_calm_codon"].iloc[0],
-        summary["auroc_calm_aa_aggregated"].iloc[0],
-    ]
-    protein_label = str(summary["protein_model"].iloc[0]).replace(" ", "\n", 1)
-    labels = [protein_label, "CaLM\ncodon", "CaLM\nAA-agg"]
-    colors = ["#9E9E9E", "#4D6F8F", "#B33F49"]
-    axes[0].bar(labels, auroc_values, color=colors, width=0.65)
-    axes[0].set_ylim(0.74, max(auroc_values) + 0.04)
-    axes[0].set_ylabel("AUROC")
-    axes[0].set_title("Pathogenicity prediction")
-    for idx, val in enumerate(auroc_values):
-        axes[0].text(idx, val + 0.006, f"{val:.3f}", ha="center", va="bottom", fontsize=8)
-
-    deg = degeneracy.copy()
-    deg["display"] = deg["flag"].map(
-        {
-            "clm_better_codon": "Codon-level\nCaLM better",
-            "clm_better_aa_aggregated": "AA-aggregated\nCaLM better",
-        }
-    )
-    y = np.arange(len(deg))
-    axes[1].errorbar(
-        deg["or_log_ref_over_mut_degeneracy"],
-        y,
-        xerr=[
-            deg["or_log_ref_over_mut_degeneracy"] - deg["or_95ci_low"],
-            deg["or_95ci_high"] - deg["or_log_ref_over_mut_degeneracy"],
-        ],
-        fmt="o",
-        color="#B33F49",
-        ecolor="#B33F49",
-        capsize=3,
-        markersize=5,
-    )
-    axes[1].axvline(1, color="#555555", linestyle=(0, (3, 2)), linewidth=0.8)
-    axes[1].set_yticks(y)
-    axes[1].set_yticklabels(deg["display"])
-    axes[1].set_xlabel("OR for log(ref degeneracy / mut degeneracy)")
-    axes[1].set_title("Degeneracy dependence")
-    for idx, row in deg.iterrows():
-        axes[1].text(
-            row["or_95ci_high"] * 1.03,
-            idx,
-            f"OR={row['or_log_ref_over_mut_degeneracy']:.2f}\np={row['p_value']:.1e}",
-            va="center",
-            fontsize=7.5,
-            color="#1F2933",
-        )
-
-    for ax in axes:
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
-        ax.grid(axis="y", color="#E8E8E8", linewidth=0.7)
-
-    fig.tight_layout()
-    FIG_DIR.mkdir(parents=True, exist_ok=True)
-    fig.savefig(FIG_DIR / f"{fig_prefix}_probability_space_control.png", dpi=600)
-    plt.close(fig)
 
 
 def parse_args() -> argparse.Namespace:
@@ -478,7 +413,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--gene-dir", type=Path, default=DEFAULT_GENE_DIR)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     parser.add_argument("--output", type=Path, default=None)
-    parser.add_argument("--fig-prefix", default="calm_aa_aggregation")
     parser.add_argument("--sort-by-length", action="store_true")
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--report-every", type=int, default=25)
@@ -500,7 +434,7 @@ def main() -> None:
     args = parse_args()
     args.out_dir.mkdir(parents=True, exist_ok=True)
     if args.output is None:
-        args.output = args.out_dir / "len1022_calm_aa_aggregation_variant_scores.csv"
+        args.output = args.out_dir / "variant_discordance_scores_raw.csv"
     scored = compute_scores(args, args.output)
     if args.score_only:
         print(
@@ -509,14 +443,11 @@ def main() -> None:
         )
         print(f"Wrote {args.output}")
         return
-    summary, degeneracy = analyze(scored, args.out_dir, args.fig_prefix)
+    summary, degeneracy = analyze(scored, args.out_dir)
     print(summary.to_string(index=False, float_format=lambda v: f"{v:.6g}"))
     print(degeneracy.to_string(index=False, float_format=lambda v: f"{v:.6g}"))
     print(f"Wrote {args.output}")
-    print(f"Wrote {args.out_dir / 'calm_aa_aggregation_control_summary.csv'}")
-    print(f"Wrote {args.out_dir / 'calm_aa_aggregation_pair_enrichment.csv'}")
-    print(f"Wrote {args.out_dir / 'calm_aa_aggregation_degeneracy_logit.csv'}")
-    print(f"Wrote {FIG_DIR / (args.fig_prefix + '_probability_space_control.png')}")
+    print(f"Wrote analysis outputs to {args.out_dir}")
 
 
 if __name__ == "__main__":

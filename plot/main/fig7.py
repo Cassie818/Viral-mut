@@ -11,10 +11,7 @@ import matplotlib.pyplot as plt
 
 
 BASE = Path("Results/ClinMAVE/cross_platform_context")
-PATHS = {
-    "ESM-2 (150M)": BASE / "dataset_pair_summary_compact_esm2_150m.csv",
-    "ESM-2 (650M)": BASE / "dataset_pair_summary_compact_esm2_650m.csv",
-}
+PAIR_TABLE = BASE / "dataset_pair_modality_weights_11_gene_pairs_table.csv"
 OUTS = [Path("Figure/fig7.png")]
 
 
@@ -46,14 +43,35 @@ COLORS = {
 
 
 def load_data() -> pd.DataFrame:
+    source = pd.read_csv(PAIR_TABLE)
+    source["pair_id"] = source["DMS_dataset"].astype(str) + "__" + source["CBGE_dataset"].astype(str)
     frames = []
-    for model, path in PATHS.items():
-        df = pd.read_csv(path)
-        df = df[df["Gene"] != "BRCA1"].copy()
-        df["model"] = model
-        df["model_short"] = "150M" if "150M" in model else "650M"
-        frames.append(df)
-    return pd.concat(frames, ignore_index=True)
+    for model_short, model_label in [("150M", "ESM-2 (150M)"), ("650M", "ESM-2 (650M)")]:
+        frame = source[
+            [
+                "Gene",
+                "pair_id",
+                "n_variants",
+                f"DMS_weight_{model_short}",
+                f"CBGE_weight_{model_short}",
+                f"delta_weight_{model_short}",
+            ]
+        ].rename(
+            columns={
+                f"DMS_weight_{model_short}": "mean_calm_weight_DMS",
+                f"CBGE_weight_{model_short}": "mean_calm_weight_CBGE",
+                f"delta_weight_{model_short}": "delta_CBGE_minus_DMS",
+            }
+        )
+        frame["model"] = model_label
+        frame["model_short"] = model_short
+        frames.append(frame)
+    data = pd.concat(frames, ignore_index=True)
+    expected = len(source)
+    counts = data.groupby("model_short")["pair_id"].nunique()
+    if not (counts == expected).all():
+        raise ValueError("The two PLM backgrounds do not contain the same matched dataset pairs")
+    return data
 
 
 def style_ax(ax: plt.Axes) -> None:

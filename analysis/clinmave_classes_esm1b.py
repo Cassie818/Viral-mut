@@ -17,7 +17,7 @@ from ensemble_optim import bayes_optimize_weights
 
 BASE = Path("Results/ClinMAVE")
 ESM1B = Path("Results/Revision/ClinMAVE_ESM1b_650M/clinmave_missense_all_with_esm1b_650m.csv")
-OUTDIR = Path("Results/Revision/ClinMAVE_ESM1b_650M/functional_effects")
+OUTDIR = Path("Results/ClinMAVE/functional_effects")
 
 MERGE_KEYS = ["Identifier", "Gene", "Transcriptid", "Site"]
 ESM_COLS = MERGE_KEYS + ["Ref", "Mut"]
@@ -128,13 +128,13 @@ def paired_t_p(a: pd.Series, b: pd.Series) -> float:
     return float(ttest_rel(pairs.iloc[:, 0], pairs.iloc[:, 1]).pvalue)
 
 
-def make_splits(df: pd.DataFrame, folds: int):
+def make_splits(df: pd.DataFrame, folds: int, seed: int):
     y = df["label"].to_numpy()
     groups = df["Gene"].astype(str).to_numpy()
     n_splits = min(folds, int(np.bincount(y).min()), int(pd.Series(groups).nunique()))
     if n_splits < 2:
         raise ValueError("Not enough data for cross-validation")
-    splitter = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=7)
+    splitter = StratifiedGroupKFold(n_splits=n_splits, shuffle=True, random_state=seed)
     return list(splitter.split(df, y, groups=groups)), "stratified_gene"
 
 
@@ -149,9 +149,17 @@ def evaluate_dataset(
     bayes_init: int,
     bayes_iter: int,
     score_scaling: str,
-) -> tuple[pd.DataFrame, dict]:
-    splits, split_type = make_splits(df, folds)
+) -> tuple[pd.DataFrame, dict, pd.DataFrame]:
+    splits, split_type = make_splits(df, folds, seed)
     rows = []
+    oof = df[["Identifier", "Gene", "label"]].copy().reset_index(drop=True)
+    oof = oof.rename(columns={"Identifier": "variant_id", "Gene": "gene"})
+    oof["assay"] = assay
+    oof["case_class"] = case_class
+    oof["fold"] = 0
+    oof["score_plm"] = np.nan
+    oof["score_calm"] = np.nan
+    oof["score_ensemble"] = np.nan
     for fold, (train_idx, test_idx) in enumerate(splits, start=1):
         train = df.iloc[train_idx].copy()
         test = df.iloc[test_idx].copy()
@@ -180,6 +188,10 @@ def evaluate_dataset(
         esm_auc = safe_roc_auc(y_test, esm_test)
         calm_auc = safe_roc_auc(y_test, calm_test)
         combo_auc = safe_roc_auc(y_test, w * calm_test + (1.0 - w) * esm_test)
+        oof.loc[test_idx, "fold"] = fold
+        oof.loc[test_idx, "score_plm"] = esm_test
+        oof.loc[test_idx, "score_calm"] = calm_test
+        oof.loc[test_idx, "score_ensemble"] = w * calm_test + (1.0 - w) * esm_test
 
         fold_row = {
             "assay": assay,
@@ -228,7 +240,9 @@ def evaluate_dataset(
     summary["p_delta_combo_vs_calm_paired_t"] = paired_t_p(
         fold_df["auroc_esm1b_650m_calm"], fold_df["auroc_calm"]
     )
-    return fold_df, summary
+    if oof[["score_plm", "score_calm", "score_ensemble"]].isna().any().any() or (oof["fold"] == 0).any():
+        raise RuntimeError(f"Incomplete out-of-fold predictions for {assay} {case_class}")
+    return fold_df, summary, oof
 
 
 def main() -> None:
@@ -238,13 +252,14 @@ def main() -> None:
     if args.analysis_table is not None:
         source = pd.read_csv(args.analysis_table)
         all_folds, summaries = [], []
+        all_oof = []
         for assay in ["DMS", "CBGE"]:
             for case_class in ["lof", "gof"]:
                 df = source[
                     (source["assay"] == assay)
                     & (source["comparison"] == f"{assay}_{case_class}_vs_normal")
                 ].copy()
-                fold_df, summary = evaluate_dataset(
+                fold_df, summary, oof = evaluate_dataset(
                     df,
                     assay,
                     case_class,
@@ -257,11 +272,17 @@ def main() -> None:
                 )
                 all_folds.append(fold_df)
                 summaries.append(summary)
+                all_oof.append(oof)
         pd.concat(all_folds, ignore_index=True).to_csv(
             args.outdir / "clinmave_esm1b_650m_calm_cv_fold_metrics.csv", index=False
         )
         pd.DataFrame(summaries).to_csv(
             args.outdir / "clinmave_esm1b_650m_calm_cv_summary.csv", index=False
+        )
+        pd.concat(all_oof, ignore_index=True).to_csv(
+            args.outdir / "clinmave_esm1b_650m_calm_oof_predictions.csv.gz",
+            index=False,
+            compression="gzip",
         )
         print(pd.DataFrame(summaries).to_string(index=False))
         print(f"\nWrote outputs to {args.outdir}")
@@ -281,6 +302,7 @@ def main() -> None:
     audits = []
     audits.append({"global_conflicting_identifiers_removed": len(global_conflict_ids)})
     merged_outputs = []
+    all_oof = []
 
     for assay in ["DMS", "CBGE"]:
         for case_class in ["lof", "gof"]:
@@ -313,7 +335,7 @@ def main() -> None:
             audits.append(dup_audit)
             merged_outputs.append(df)
 
-            fold_df, summary = evaluate_dataset(
+            fold_df, summary, oof = evaluate_dataset(
                 df,
                 assay,
                 case_class,
@@ -326,10 +348,16 @@ def main() -> None:
             )
             all_folds.append(fold_df)
             summaries.append(summary)
+            all_oof.append(oof)
 
     pd.concat(all_folds, ignore_index=True).to_csv(args.outdir / "clinmave_esm1b_650m_calm_cv_fold_metrics.csv", index=False)
     pd.DataFrame(summaries).to_csv(args.outdir / "clinmave_esm1b_650m_calm_cv_summary.csv", index=False)
     pd.DataFrame(audits).to_csv(args.outdir / "clinmave_esm1b_650m_calm_merge_audit.csv", index=False)
+    pd.concat(all_oof, ignore_index=True).to_csv(
+        args.outdir / "clinmave_esm1b_650m_calm_oof_predictions.csv.gz",
+        index=False,
+        compression="gzip",
+    )
     if args.write_analysis_table:
         pd.concat(merged_outputs, ignore_index=True).to_csv(
             args.outdir / "clinmave_esm1b_650m_calm_analysis_table.csv", index=False

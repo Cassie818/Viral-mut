@@ -39,6 +39,19 @@ SCORE_COLUMNS = {
     "ESM-1b 650M": "esm1b_650m_score",
     "CaLM": "calm_score",
 }
+OOF_COLUMNS = {
+    "ESM-2 150M": "score_esm2_150m",
+    "ESM-2 650M": "score_esm2_650m",
+    "ESM-1b 650M": "score_esm1b_650m",
+    "CaLM": "score_calm",
+    "ESM-2 150M + ESM-2 650M": "score_esm2_150m_esm2_650m",
+    "ESM-2 650M + ESM-1b 650M": "score_esm2_650m_esm1b_650m",
+    "ESM-2 150M + ESM-1b 650M": "score_esm2_150m_esm1b_650m",
+    "ESM-2 150M + CaLM": "score_esm2_150m_calm",
+    "ESM-2 650M + CaLM": "score_esm2_650m_calm",
+    "ESM-1b 650M + CaLM": "score_esm1b_650m_calm",
+    "ESM-2 650M + ESM-1b 650M + CaLM": "score_esm2_650m_esm1b_650m_calm",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -63,7 +76,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--out-dir",
-        default="Results/Revision/len1022_model_control",
+        default="Results/ClinVar/model_control",
     )
     parser.add_argument("--n-splits", type=int, default=10)
     parser.add_argument("--seed", type=int, default=16)
@@ -74,6 +87,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--bayes-iter", type=int, default=20)
     parser.add_argument("--bayes-pair-step", type=float, default=0.001)
     parser.add_argument("--bayes-triple-step", type=float, default=0.01)
+    parser.add_argument("--write-score-tables", action="store_true")
     return parser.parse_args()
 
 
@@ -156,8 +170,9 @@ def main() -> None:
     df_all = load_scores(args)
     score_cols = list(SCORE_COLUMNS.values())
     df = df_all.dropna(subset=["label", "Gene_prot", *score_cols]).copy()
-    df_all.to_csv(out_dir / "len1022_model_control_score_table_all_variants.csv", index=False)
-    df.to_csv(out_dir / "len1022_model_control_score_table_complete_cases.csv", index=False)
+    if args.write_score_tables:
+        df_all.to_csv(out_dir / "model_control_score_table_all_variants.csv", index=False)
+        df.to_csv(out_dir / "model_control_score_table_complete_cases.csv", index=False)
 
     y = df["label"].to_numpy(dtype=int)
     groups = df["Gene_prot"].astype(str).to_numpy()
@@ -185,6 +200,11 @@ def main() -> None:
     ]
 
     rows = []
+    oof = df[["variant_id", "Gene_prot", "label"]].copy()
+    oof = oof.rename(columns={"Gene_prot": "gene"})
+    oof["fold"] = 0
+    for column in OOF_COLUMNS.values():
+        oof[column] = np.nan
     for fold, (train_idx, test_idx) in enumerate(splits, start=1):
         y_train = y[train_idx]
         y_test = y[test_idx]
@@ -224,6 +244,9 @@ def main() -> None:
                 for component in components
             ]
             test_score = mix_scores(weights, test_scores)
+            test_rows = df.index[test_idx]
+            oof.loc[test_rows, "fold"] = fold
+            oof.loc[test_rows, OOF_COLUMNS[model_name]] = test_score
             weight_by_component = dict(zip(components, weights))
             rows.append(
                 {
@@ -279,6 +302,9 @@ def main() -> None:
     summary.to_csv(out_dir / "model_control_gene_heldout_summary.csv", index=False)
     paired_tests(fold_df).to_csv(out_dir / "model_control_paired_tests.csv", index=False)
     audit.to_csv(out_dir / "model_control_input_audit.csv", index=False)
+    if oof[list(OOF_COLUMNS.values())].isna().any().any() or (oof["fold"] == 0).any():
+        raise RuntimeError("Incomplete out-of-fold predictions")
+    oof.to_csv(out_dir / "model_control_oof_predictions.csv.gz", index=False, compression="gzip")
 
     print(audit.to_string(index=False))
     print(summary.to_string(index=False, float_format=lambda value: f"{value:.4f}"))

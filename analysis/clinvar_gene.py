@@ -177,7 +177,7 @@ def write_gene_list(df: pd.DataFrame, mask_col: str, metric_col: str, filename: 
 
 
 def write_ranked_set_tables(df: pd.DataFrame) -> None:
-    """Write auditable top-decile and top-20 overlap tables."""
+    """Write auditable top-decile overlap tables."""
     out = df.copy()
     out["top_weight_both_plm_backgrounds"] = (
         out["esm2_top_codon_weight_decile"] & out["esm1b_top_codon_weight_decile"]
@@ -220,28 +220,6 @@ def write_ranked_set_tables(df: pd.DataFrame) -> None:
     )
     decile_table.to_csv(OUT_DIR / "top_decile_genes_across_plm_backgrounds.csv", index=False)
     decile_table.to_excel(OUT_DIR / "top_decile_genes_across_plm_backgrounds.xlsx", index=False)
-
-    top20_mask = (out["esm2_codon_rank"] <= 20) & (out["esm2_gain_rank"] <= 20)
-    top20_columns = [
-        "gene",
-        "esm2_codon_rank",
-        "esm2_calm_weight",
-        "n",
-        "n_pathogenic",
-        "n_benign",
-        "esm2_gain_rank",
-        "esm2_cross_modal_gain",
-    ]
-    top20 = out.loc[top20_mask, top20_columns].rename(
-        columns={
-            "esm2_codon_rank": "rank_by_calm_weight",
-            "esm2_gain_rank": "rank_by_cross_modal_gain",
-        }
-    )
-    top20.sort_values("rank_by_calm_weight").to_csv(
-        OUT_DIR / "top20_calm_weight_cross_modal_gain_intersection.csv", index=False
-    )
-
 
 def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)

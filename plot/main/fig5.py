@@ -4,15 +4,11 @@
 from __future__ import annotations
 
 import os
-from collections import Counter
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from matplotlib.colors import LogNorm
 from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm
-from scipy.stats import fisher_exact
-from statsmodels.stats.multitest import multipletests
 
 
 BASE = Path("Results/ClinVar/substitution_discordance")
@@ -35,8 +31,6 @@ MORANDI_DIVERGING = LinearSegmentedColormap.from_list(
     "muted_blue_coral",
     ["#5E8797", "#B9D0D4", "#FAF9F6", "#EBC2B9", "#CD8178"],
 )
-PATHOGENIC_LABELS = {"pathogenic", "likely_pathogenic"}
-BENIGN_LABELS = {"benign", "likely_benign"}
 
 
 def add_panel_label(ax: plt.Axes, label: str) -> None:
@@ -87,8 +81,9 @@ def plot_discordance_scatter(ax: plt.Axes, variants: pd.DataFrame) -> None:
     ax.axvline(0, color="#DADAD6", linewidth=0.55)
     ax.set_xlim(-lim, lim)
     ax.set_ylim(-lim, lim)
-    ax.set_xlabel("Codon-space discordance")
-    ax.set_ylabel("AA-space discordance")
+    ax.set_xlabel("Codon-space discordance", fontsize=7.2)
+    ax.set_ylabel("AA-space discordance", fontsize=7.2)
+    ax.tick_params(axis="both", labelsize=7.0)
     ax.text(
         0.05,
         0.92,
@@ -160,124 +155,13 @@ def plot_degeneracy_forest(ax: plt.Axes, comparison: pd.DataFrame) -> None:
             )
     ax.axhline(1, color=DARK, linestyle=(0, (3, 2)), linewidth=0.7)
     ax.set_xticks(x)
-    ax.set_xticklabels(["CaLM\ncodon", "AA-\naggregated"])
+    ax.set_xticklabels(["CaLM\ncodon", "AA-\naggregated"], fontsize=6.4)
     ax.set_ylim(0, 1.08)
     ax.set_xlim(-0.55, len(df) - 0.45)
-    ax.set_ylabel("OR")
+    ax.set_ylabel("OR", fontsize=6.6)
+    ax.tick_params(axis="y", labelsize=6.4)
     add_panel_label(ax, "B")
     format_axes(ax)
-
-
-def extreme_sets_esm2_650m_aa(variants: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, float, float]:
-    df = variants.dropna(subset=["esm2_650m_llr", "calm_aa_agg_llr", "Label_prot"]).copy()
-    df["diff_aa_agg_650m"] = df["esm2_650m_llr"] - df["calm_aa_agg_llr"]
-    lower = float(df["diff_aa_agg_650m"].quantile(0.01))
-    upper = float(df["diff_aa_agg_650m"].quantile(0.99))
-    calm = pd.concat(
-        [
-            df[(df["diff_aa_agg_650m"] > upper) & (df["Label_prot"].isin(PATHOGENIC_LABELS))],
-            df[(df["diff_aa_agg_650m"] < lower) & (df["Label_prot"].isin(BENIGN_LABELS))],
-        ],
-        ignore_index=False,
-    )
-    plm = pd.concat(
-        [
-            df[(df["diff_aa_agg_650m"] < lower) & (df["Label_prot"].isin(PATHOGENIC_LABELS))],
-            df[(df["diff_aa_agg_650m"] > upper) & (df["Label_prot"].isin(BENIGN_LABELS))],
-        ],
-        ignore_index=False,
-    )
-    return calm, plm, lower, upper
-
-
-def pair_enrichment(variants: pd.DataFrame, subset: pd.DataFrame, prefix: str) -> pd.DataFrame:
-    df = variants.dropna(subset=["Ref_prot", "Mut_prot"]).copy()
-    df["Pair"] = list(zip(df["Ref_prot"], df["Mut_prot"]))
-    sub = subset.dropna(subset=["Ref_prot", "Mut_prot"]).copy()
-    sub["Pair"] = list(zip(sub["Ref_prot"], sub["Mut_prot"]))
-    overall = Counter(df["Pair"])
-    subset_counts = Counter(sub["Pair"])
-    total = sum(overall.values())
-    subset_total = sum(subset_counts.values())
-    rest_total = total - subset_total
-    rows = []
-    pvals = []
-    for pair in sorted(overall):
-        n_total = overall[pair]
-        n_subset = subset_counts[pair]
-        freq_overall = n_total / total
-        freq_subset = n_subset / subset_total if subset_total else np.nan
-        br = freq_subset / freq_overall if freq_overall and subset_total else np.nan
-        a = n_subset
-        b = subset_total - n_subset
-        c = n_total - n_subset
-        d = rest_total - c
-        _, pval = fisher_exact([[a, b], [c, d]], alternative="two-sided")
-        pvals.append(pval)
-        rows.append(
-            {
-                "Pair": pair,
-                "Ref_prot": pair[0],
-                "Mut_prot": pair[1],
-                f"Count_{prefix}_aa_aggregated": n_subset,
-                "Count_overall": n_total,
-                f"Freq_{prefix}_aa_aggregated": freq_subset,
-                "Freq_overall": freq_overall,
-                f"BR_{prefix}_aa_aggregated": br,
-                f"pvalue_{prefix}_aa_aggregated_raw": pval,
-            }
-        )
-    reject, pvals_corr, _, _ = multipletests(pvals, alpha=0.01, method="fdr_bh")
-    out = pd.DataFrame(rows)
-    out[f"pvalue_{prefix}_aa_aggregated_corrected"] = pvals_corr
-    out[f"significant_{prefix}_aa_aggregated"] = reject
-    return out
-
-
-def build_esm2_650m_pair_enrichment(variants: pd.DataFrame) -> pd.DataFrame:
-    complete = variants.dropna(subset=["esm2_650m_llr", "calm_aa_agg_llr", "Ref_prot", "Mut_prot"]).copy()
-    calm, plm, lower, upper = extreme_sets_esm2_650m_aa(complete)
-    calm_pair = pair_enrichment(complete, calm, "clm")
-    plm_pair = pair_enrichment(complete, plm, "plm")
-    out = calm_pair.merge(
-        plm_pair.drop(columns=["Ref_prot", "Mut_prot", "Count_overall", "Freq_overall"]),
-        on="Pair",
-        how="outer",
-    )
-    out["protein_model"] = "ESM-2 650M"
-    out["space"] = "aa_aggregated"
-    out["lower_1pct"] = lower
-    out["upper_99pct"] = upper
-    out["clm_leaning_n"] = len(calm)
-    out["plm_leaning_n"] = len(plm)
-    out.to_csv(BASE / "pair_enrichment_esm2_650m_aa_aggregated.csv", index=False)
-    summary = pd.DataFrame(
-        [
-            {
-                "protein_model": "ESM-2 650M",
-                "space": "aa_aggregated",
-                "n_variants": len(complete),
-                "lower_1pct": lower,
-                "upper_99pct": upper,
-                "clm_leaning_n": len(calm),
-                "plm_leaning_n": len(plm),
-                "clm_enriched_pairs_fdr01": int(
-                    (
-                        out["significant_clm_aa_aggregated"].fillna(False)
-                        & (out["BR_clm_aa_aggregated"] > 1)
-                    ).sum()
-                ),
-                "plm_enriched_pairs_fdr01": int(
-                    (
-                        out["significant_plm_aa_aggregated"].fillna(False)
-                        & (out["BR_plm_aa_aggregated"] > 1)
-                    ).sum()
-                ),
-            }
-        ]
-    )
-    summary.to_csv(BASE / "pair_enrichment_esm2_650m_aa_aggregated_summary.csv", index=False)
-    return out
 
 
 def heatmap_matrix(pair_df: pd.DataFrame, prefix: str) -> tuple[np.ndarray, np.ndarray]:
@@ -323,8 +207,8 @@ def plot_pair_heatmap(
     ax.set_xticklabels(AA_ORDER, fontsize=7.0)
     ax.set_yticks(np.arange(len(AA_ORDER)))
     ax.set_yticklabels(AA_ORDER, fontsize=7.0)
-    ax.set_xlabel("Mutant amino acid")
-    ax.set_ylabel("Reference amino acid")
+    ax.set_xlabel("Mutant amino acid", fontsize=7.2)
+    ax.set_ylabel("Reference amino acid", fontsize=7.2)
     ax.set_xlim(-0.6, len(AA_ORDER) - 0.4)
     ax.set_ylim(len(AA_ORDER) - 0.4, -0.6)
     ax.set_aspect("equal", adjustable="box")
@@ -341,7 +225,7 @@ def plot_pair_heatmap(
             linewidths=0.75,
             zorder=3,
         )
-    ax.set_title(label, fontsize=8.0, color=DARK, pad=7.0)
+    ax.set_title(label, fontsize=8.0, color="#000000", pad=7.0)
     if add_cbar:
         cbar = plt.colorbar(im, ax=ax, cax=cbar_ax, fraction=0.038, pad=0.075)
         cbar.set_label(r"log$_2$ enrichment", fontsize=7.4)
@@ -358,7 +242,7 @@ def main() -> None:
     FIG_DIR.mkdir(parents=True, exist_ok=True)
     variants = pd.read_csv(BASE / "variant_discordance_scores.csv.gz")
     comparison = pd.read_csv(BASE / "discordance_model_comparison.csv")
-    aa_pair = build_esm2_650m_pair_enrichment(variants)
+    aa_pair = pd.read_csv(BASE / "pair_enrichment_esm2_650m_aa_aggregated.csv")
 
     plt.rcParams.update(
         {

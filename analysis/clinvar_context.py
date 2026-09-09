@@ -92,14 +92,12 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--scores",
-        default=(
-            "Results/Revision/len1022_model_control/"
-            "len1022_model_control_score_table_all_variants.csv"
-        ),
+        default="Results/ClinVar/current_missense_cohort/clinvar_missense_len1022_complete_cases_model_scores.csv",
     )
-    parser.add_argument("--out-dir", default="Results/Revision/fig3_fixed_esm2_context_calm")
+    parser.add_argument("--out-dir", default="Results/ClinVar/context_control")
     parser.add_argument("--n-splits", type=int, default=10)
     parser.add_argument("--seed", type=int, default=16)
+    parser.add_argument("--write-score-table", action="store_true")
     return parser.parse_args()
 
 
@@ -176,7 +174,7 @@ def make_pipeline(numeric_cols: list[str], categorical_cols: list[str]) -> Pipel
     preprocessor = ColumnTransformer(
         transformers=[
             ("num", StandardScaler(), numeric_cols),
-            ("cat", OneHotEncoder(handle_unknown="ignore", sparse=False), categorical_cols),
+            ("cat", OneHotEncoder(handle_unknown="ignore", sparse_output=False), categorical_cols),
         ],
         remainder="drop",
     )
@@ -277,8 +275,9 @@ def main() -> None:
     required = sorted(
         set(["label", "Gene_prot"] + [col for _, nums, cats in model_specs for col in nums + cats])
     )
-    complete = df.dropna(subset=required).copy()
-    complete.to_csv(out_dir / "fig3_fixed_esm2_context_calm_score_table.csv", index=False)
+    complete = df.dropna(subset=required).reset_index(drop=True)
+    if args.write_score_table:
+        complete.to_csv(out_dir / "context_control_score_table.csv", index=False)
 
     y = complete["label"].to_numpy(dtype=int)
     groups = complete["Gene_prot"].astype(str).to_numpy()
@@ -287,6 +286,20 @@ def main() -> None:
             complete, y, groups
         )
     )
+
+    oof_columns = {
+        "ESM-2 650M": "score_esm2_650m",
+        "ESM-2 650M + mutational context": "score_esm2_650m_context",
+        "ESM-2 650M + CaLM": "score_esm2_650m_calm",
+        "ESM-2 650M + mutational context + CaLM": "score_esm2_650m_context_calm",
+    }
+    id_cols = [column for column in ["variant_id", "Gene_prot", "label"] if column in complete.columns]
+    oof = complete[id_cols].copy().rename(columns={"Gene_prot": "gene"})
+    if "variant_id" not in oof.columns:
+        oof["variant_id"] = complete.index.astype(str)
+    oof["fold"] = 0
+    for column in oof_columns.values():
+        oof[column] = np.nan
 
     rows = []
     for fold, (train_idx, test_idx) in enumerate(splits, start=1):
@@ -298,6 +311,8 @@ def main() -> None:
             pipeline = make_pipeline(numeric_cols, categorical_cols)
             pipeline.fit(train[numeric_cols + categorical_cols], y_train)
             pred = pipeline.predict_proba(test[numeric_cols + categorical_cols])[:, 1]
+            oof.loc[test_idx, "fold"] = fold
+            oof.loc[test_idx, oof_columns[model_name]] = pred
             rows.append(
                 {
                     "fold": fold,
@@ -332,10 +347,13 @@ def main() -> None:
             }
         ]
     )
-    fold_df.to_csv(out_dir / "fig3_fixed_esm2_context_calm_fold_results.csv", index=False)
-    summary.to_csv(out_dir / "fig3_fixed_esm2_context_calm_summary.csv", index=False)
-    paired_tests(fold_df).to_csv(out_dir / "fig3_fixed_esm2_context_calm_paired_tests.csv", index=False)
-    audit.to_csv(out_dir / "fig3_fixed_esm2_context_calm_input_audit.csv", index=False)
+    fold_df.to_csv(out_dir / "context_control_fold_results.csv", index=False)
+    summary.to_csv(out_dir / "context_control_summary.csv", index=False)
+    paired_tests(fold_df).to_csv(out_dir / "context_control_paired_tests.csv", index=False)
+    audit.to_csv(out_dir / "context_control_input_audit.csv", index=False)
+    if oof[list(oof_columns.values())].isna().any().any() or (oof["fold"] == 0).any():
+        raise RuntimeError("Incomplete out-of-fold predictions")
+    oof.to_csv(out_dir / "context_control_oof_predictions.csv.gz", index=False, compression="gzip")
 
     print(audit.to_string(index=False))
     print(summary.to_string(index=False, float_format=lambda value: f"{value:.4f}"))

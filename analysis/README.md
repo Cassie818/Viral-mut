@@ -7,6 +7,7 @@ Top-level ClinVar analyses:
 - `clinvar_discordance.py`: amino-acid aggregation and substitution discordance
 - `clinvar_gene_prepare.py`: preparation of gene-level source tables
 - `clinvar_gene.py`: gene-level codon-contribution analysis
+- `gene_bootstrap.py`: gene-cluster bootstrap inference for pooled out-of-fold AUROCs and differences
 
 Top-level ClinMAVE analyses:
 
