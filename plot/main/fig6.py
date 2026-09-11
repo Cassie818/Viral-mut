@@ -412,37 +412,6 @@ def enrichment_panel(ax: plt.Axes) -> None:
     format_ax(ax, "x")
 
 
-def overlap_panel(ax: plt.Axes) -> None:
-    esm2_weight = set(pd.read_csv(BASE / "esm2_top_codon_weight_decile_genes.csv")["gene"])
-    esm2_gain = set(pd.read_csv(BASE / "esm2_top_cross_modal_gain_decile_genes.csv")["gene"])
-    esm1b_weight = set(pd.read_csv(BASE / "esm1b_top_codon_weight_decile_genes.csv")["gene"])
-    esm1b_gain = set(pd.read_csv(BASE / "esm1b_top_gain_decile_genes.csv")["gene"])
-    labels = [
-        "ESM-2 weight vs ESM-1b weight",
-        "ESM-2 gain vs ESM-1b gain",
-        "ESM-2 weight vs ESM-2 gain",
-    ]
-    overlaps = [
-        len(esm2_weight & esm1b_weight),
-        len(esm2_gain & esm1b_gain),
-        len(esm2_weight & esm2_gain),
-    ]
-    jaccards = [
-        len(esm2_weight & esm1b_weight) / len(esm2_weight | esm1b_weight),
-        len(esm2_gain & esm1b_gain) / len(esm2_gain | esm1b_gain),
-        len(esm2_weight & esm2_gain) / len(esm2_weight | esm2_gain),
-    ]
-    y = np.arange(len(labels))[::-1]
-    ax.barh(y, overlaps, color=[TEAL, BLUE, LILAC], edgecolor=EDGE, linewidth=0.8, height=0.62)
-    ax.set_yticks(y)
-    ax.set_yticklabels(labels, fontsize=6.6)
-    ax.set_xlabel("Shared genes among top deciles")
-    ax.set_xlim(0, 30)
-    for yi, val, jac in zip(y, overlaps, jaccards):
-        ax.text(val + 0.6, yi, f"{val}/47, J={jac:.2f}", ha="left", va="center", fontsize=6.8, color=TEXT)
-    format_ax(ax, "x")
-
-
 def main() -> None:
     setup()
     FIG_DIR.mkdir(parents=True, exist_ok=True)
