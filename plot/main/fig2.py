@@ -232,12 +232,20 @@ def plot_auroc_panel(ax, summary: pd.DataFrame, bootstrap: pd.DataFrame) -> None
 
 
 def plot_weight_panel(ax, folds: pd.DataFrame) -> None:
+    standardized = pd.read_csv(MODEL_DIR / "standardized_equivalent_weights_by_fold.csv")
+    standardized = standardized.pivot_table(
+        index=["ensemble", "fold"], columns="component",
+        values="standardized_equivalent_weight", fill_value=0.0,
+    ).reset_index()
     rows = []
     for model in WEIGHT_ORDER:
-        sub = folds[folds["model"] == model]
+        sub = standardized[standardized["ensemble"] == model]
         row = {"model": model}
+        component_names = {"w_esm2_150m": "ESM-2 150M", "w_esm2_650m": "ESM-2 650M",
+                           "w_esm1b_650m": "ESM-1b 650M", "w_calm": "CaLM"}
         for col, _, _ in WEIGHT_COMPONENTS:
-            row[col] = sub[col].mean()
+            component = component_names[col]
+            row[col] = float(sub[component].mean()) if component in sub.columns else 0.0
         rows.append(row)
     summary = pd.DataFrame(rows)
 
@@ -261,8 +269,8 @@ def plot_weight_panel(ax, folds: pd.DataFrame) -> None:
                 ax.text(start + val / 2, yi, f"{val:.2f}", ha="center", va="center", fontsize=7.0, color="#2F2F2F")
         left += vals
 
-    add_panel_label(ax, "B", "Optimized ensemble weights")
-    ax.set_xlabel("Optimized ensemble weight")
+    add_panel_label(ax, "B", "Scale-adjusted ensemble weights")
+    ax.set_xlabel("Scale-adjusted ensemble weight")
     ax.set_xlim(0, 1)
     ax.set_xticks(np.linspace(0, 1, 6))
     ax.set_yticks(y)

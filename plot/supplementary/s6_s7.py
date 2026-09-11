@@ -187,6 +187,18 @@ def main() -> None:
     figure_dir.mkdir(parents=True, exist_ok=True)
 
     folds, summaries = load_results(input_dir)
+    # Replace descriptive raw-weight summaries with scale-adjusted equivalents.
+    standardized_summary = pd.read_csv(input_dir / "fig3_standardized_equivalent_weight_summary.csv")
+    for model, summary in summaries.items():
+        scale = standardized_summary[standardized_summary["model"] == model].set_index(["assay", "case_class"])
+        summary["mean_calm_weight"] = [
+            scale.loc[(a, c), "mean_standardized_equivalent_calm_weight"]
+            for a, c in zip(summary["assay"], summary["case_class"])
+        ]
+        summary["sd_calm_weight"] = [
+            scale.loc[(a, c), "sd_standardized_equivalent_calm_weight"]
+            for a, c in zip(summary["assay"], summary["case_class"])
+        ]
     build_summary_table(folds, summaries).to_csv(
         table_dir / "clinmave_functional_class_results.csv", index=False
     )
