@@ -55,8 +55,14 @@ def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         df = pd.read_csv(path)
         df["model"] = model
         folds.append(df)
+    summary = pd.concat(summaries, ignore_index=True)
+    scale_path = BASE / "fig3_standardized_equivalent_weight_summary.csv"
+    scale = pd.read_csv(scale_path)
+    scale = scale.rename(columns={"model": "model_scale"})
+    summary = summary.merge(scale, left_on=["model", "assay", "case_class"],
+                            right_on=["model_scale", "assay", "case_class"], how="left")
     return (
-        pd.concat(summaries, ignore_index=True),
+        summary,
         pd.concat(folds, ignore_index=True),
         pd.read_csv(BOOTSTRAP_FILE),
     )
@@ -136,8 +142,8 @@ def collect_plot_rows(
                     "case_class": case_class,
                     "group_label": group_label.replace("\n", " "),
                     "model": model,
-                    "mean_calm_weight": row["mean_calm_weight"],
-                    "sd_calm_weight": row["sd_calm_weight"],
+                    "mean_calm_weight": row["mean_standardized_equivalent_calm_weight"],
+                    "sd_calm_weight": row["sd_standardized_equivalent_calm_weight"],
                     "delta_auroc_vs_plm": boot["pooled_oof_delta_auroc"],
                     "sd_delta_auroc_vs_plm": row[delta_sd],
                     "ci95_delta_low": boot["bootstrap_95ci_low"],
@@ -266,7 +272,7 @@ def main() -> None:
         plot_df,
         "mean_calm_weight",
         "sd_calm_weight",
-        "Optimised CaLM weight",
+        "Scale-adjusted CaLM weight",
         (0.0, 1.12),
         np.linspace(0.0, 1.0, 6),
         "A",

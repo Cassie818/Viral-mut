@@ -594,7 +594,15 @@ def plot_weight_distribution(gene_folds: pd.DataFrame) -> None:
         ("w_esm1b_650m", "ESM-1b (650M)", COLORS["lilac"]),
         ("w_calm", "CaLM", COLORS["green"]),
     ]
-    sub = gene_folds[gene_folds["model"].isin(models)].copy()
+    standardized = pd.read_csv(MODEL_DIR / "standardized_equivalent_weights_by_fold.csv")
+    standardized = standardized[standardized["ensemble"].isin(models)].copy()
+    sub = standardized.pivot_table(index=["ensemble", "fold"], columns="component",
+                                   values="standardized_equivalent_weight", fill_value=0).reset_index()
+    for col, label, _ in component_cols:
+        component = {"w_esm2_150m":"ESM-2 150M", "w_esm2_650m":"ESM-2 650M",
+                     "w_esm1b_650m":"ESM-1b 650M", "w_calm":"CaLM"}[col]
+        sub[col] = sub.get(component, 0.0)
+    sub = sub.rename(columns={"ensemble": "model"})
     summary = (
         sub.groupby("model")[[col for col, _, _ in component_cols]]
         .agg(["mean", "std"])
@@ -619,8 +627,8 @@ def plot_weight_distribution(gene_folds: pd.DataFrame) -> None:
         ax.set_xticklabels([label for _, label, _ in component_cols], rotation=38, ha="right", fontsize=6.3)
         ax.set_ylim(-0.03, 1.03)
         format_ax(ax)
-    axes[0, 0].set_ylabel("Optimized weight")
-    axes[1, 0].set_ylabel("Optimized weight")
+    axes[0, 0].set_ylabel("Scale-adjusted weight")
+    axes[1, 0].set_ylabel("Scale-adjusted weight")
     fig.tight_layout(w_pad=0.65, h_pad=0.85)
     fig.savefig(FIG_DIR / "figS4.png", dpi=600, bbox_inches="tight")
     plt.close(fig)

@@ -99,6 +99,12 @@ def panel(
 def main() -> None:
     setup()
     df = pd.read_csv(DATA)
+    scale = pd.read_csv("Results/ClinVar/gene_level/fig6_standardized_equivalent_weight_summary.csv")
+    for model, target in [("ESM-2 650M + CaLM", "esm2_calm_weight"), ("ESM-1b 650M + CaLM", "esm1b_calm_weight")]:
+        sub = scale[scale["model"] == model][["gene", "mean_standardized_equivalent_calm_weight"]]
+        df = df.merge(sub, on="gene", how="left")
+        df[target] = df["mean_standardized_equivalent_calm_weight"]
+        df = df.drop(columns=["mean_standardized_equivalent_calm_weight"])
     stats = pd.read_csv(STATS).set_index("analysis")
     esm1b_adjusted = stats.loc["esm1b_calm_auroc_predicts_gain_adjusting_for_plm_auroc"]
     plm_control_adjusted = stats.loc[
@@ -111,7 +117,7 @@ def main() -> None:
         df,
         "esm1b_calm_weight",
         "esm1b_gain_over_protein",
-        r"$\bar{w}_g$",
+        r"$\bar{w}^{\mathrm{scale}}_g$",
         r"$\Delta\mathrm{AUROC}_{+\mathrm{CaLM}}$",
         "ESM-1b (650M)",
     )
@@ -132,7 +138,7 @@ def main() -> None:
         df,
         "esm2_calm_weight",
         "esm2_cross_modal_advantage",
-        r"$\bar{w}_g$",
+        r"$\bar{w}^{\mathrm{scale}}_g$",
         r"$\Delta\mathrm{AUROC}_{\mathrm{adv}}$",
         "PLM+PLM control",
     )

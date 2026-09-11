@@ -139,19 +139,23 @@ def plot_gof_deltas(folds: dict[str, pd.DataFrame], figure_path: Path) -> None:
     plt.close(fig)
 
 
-def plot_weights(folds: dict[str, pd.DataFrame], figure_path: Path) -> None:
+def plot_weights(folds: dict[str, pd.DataFrame], figure_path: Path, input_dir: Path) -> None:
     plt.rcParams.update({"font.family": "Arial", "font.size": 8, "axes.labelsize": 9})
     fig, ax = plt.subplots(figsize=(6.6, 2.9))
     labels = ["DMS\nLoF", "DMS\nGoF", "CBGE\nLoF", "CBGE\nGoF"]
     rng = np.random.default_rng(17)
+    standardized = pd.read_csv(input_dir / "fig3_standardized_equivalent_fold_weights.csv")
+    model_key = {"ESM-2 (650M)": "ESM-2 (650M)", "ESM-1b (650M)": "ESM-1b (650M)"}
     for offset, (model, config) in zip([-0.14, 0.14], MODELS.items()):
         for index, (assay, case_class) in enumerate(GROUPS):
-            values = folds[model][(folds[model]["assay"] == assay) & (folds[model]["case_class"] == case_class)]["calm_weight"].to_numpy(float)
+            values = standardized[(standardized["model"] == model_key[model]) &
+                                  (standardized["assay"] == assay) &
+                                  (standardized["case_class"] == case_class)]["standardized_equivalent_calm_weight"].to_numpy(float)
             x = np.full(len(values), index + offset) + rng.normal(0, 0.025, len(values))
             ax.scatter(x, values, s=24, color=config["color"], edgecolor=EDGE, linewidth=0.4, alpha=0.95, zorder=3)
     ax.set_xticks(range(len(GROUPS)))
     ax.set_xticklabels(labels)
-    ax.set_ylabel("Optimised CaLM weight")
+    ax.set_ylabel("Scale-adjusted CaLM weight")
     ax.set_ylim(-0.04, 1.06)
     legend_handles = [
         Line2D(
@@ -187,7 +191,7 @@ def main() -> None:
         table_dir / "clinmave_functional_class_results.csv", index=False
     )
     plot_gof_deltas(folds, figure_dir / "figS6.png")
-    plot_weights(folds, figure_dir / "figS7.png")
+    plot_weights(folds, figure_dir / "figS7.png", input_dir)
 
 
 if __name__ == "__main__":
