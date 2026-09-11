@@ -12,7 +12,6 @@ from scipy.stats import ttest_rel
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import StratifiedGroupKFold
 
-from ensemble_optim import bayes_optimize_weights
 
 
 BASE = Path("Results/ClinMAVE")
@@ -32,11 +31,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--analysis-table", type=Path)
     parser.add_argument("--outdir", type=Path, default=OUTDIR)
     parser.add_argument("--folds", type=int, default=10)
-    parser.add_argument("--optimizer", choices=["grid", "bayes"], default="grid")
     parser.add_argument("--score-scaling", choices=["raw", "standardized"], default="raw")
     parser.add_argument("--seed", type=int, default=7)
-    parser.add_argument("--bayes-init", type=int, default=10)
-    parser.add_argument("--bayes-iter", type=int, default=20)
     parser.add_argument("--write-analysis-table", action="store_true")
     parser.add_argument(
         "--drop-global-conflicts",
@@ -85,22 +81,7 @@ def best_weight(
     y: np.ndarray,
     esm: np.ndarray,
     calm: np.ndarray,
-    *,
-    optimizer: str,
-    seed: int,
-    bayes_init: int,
-    bayes_iter: int,
 ) -> float:
-    if optimizer == "bayes":
-        weights, _, _ = bayes_optimize_weights(
-            y,
-            [esm, calm],
-            seed=seed,
-            n_init=bayes_init,
-            n_iter=bayes_iter,
-            candidate_step=0.001,
-        )
-        return float(weights[1])
     best_w = 0.0
     best_auc = -np.inf
     for w in WEIGHTS:
@@ -144,10 +125,7 @@ def evaluate_dataset(
     case_class: str,
     folds: int,
     *,
-    optimizer: str,
     seed: int,
-    bayes_init: int,
-    bayes_iter: int,
     score_scaling: str,
 ) -> tuple[pd.DataFrame, dict, pd.DataFrame]:
     splits, split_type = make_splits(df, folds, seed)
@@ -179,10 +157,6 @@ def evaluate_dataset(
             y_train,
             esm_train,
             calm_train,
-            optimizer=optimizer,
-            seed=seed + 100 * fold,
-            bayes_init=bayes_init,
-            bayes_iter=bayes_iter,
         )
 
         esm_auc = safe_roc_auc(y_test, esm_test)
@@ -198,7 +172,7 @@ def evaluate_dataset(
             "case_class": case_class,
             "fold": fold,
             "split_type": split_type,
-            "optimizer": optimizer,
+            "optimizer": "grid",
             "score_scaling": score_scaling,
             "n_train": len(train),
             "n_test": len(test),
@@ -220,7 +194,7 @@ def evaluate_dataset(
         "assay": assay,
         "case_class": case_class,
         "split_type": split_type,
-        "optimizer": optimizer,
+        "optimizer": "grid",
         "score_scaling": score_scaling,
         "n_variants": len(df),
         "n_cases": int(df["label"].sum()),
@@ -264,10 +238,7 @@ def main() -> None:
                     assay,
                     case_class,
                     args.folds,
-                    optimizer=args.optimizer,
-                    seed=args.seed,
-                    bayes_init=args.bayes_init,
-                    bayes_iter=args.bayes_iter,
+                            seed=args.seed,
                     score_scaling=args.score_scaling,
                 )
                 all_folds.append(fold_df)
@@ -340,10 +311,7 @@ def main() -> None:
                 assay,
                 case_class,
                 args.folds,
-                optimizer=args.optimizer,
-                seed=args.seed,
-                bayes_init=args.bayes_init,
-                bayes_iter=args.bayes_iter,
+                    seed=args.seed,
                 score_scaling=args.score_scaling,
             )
             all_folds.append(fold_df)

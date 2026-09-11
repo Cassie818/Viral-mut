@@ -22,7 +22,6 @@ The main analyses use ClinVar and ClinMAVE variant datasets to evaluate:
 ```text
 analysis/               Statistical analyses and model-scoring code
   scoring/              Data preparation and CaLM/PLM scoring utilities
-  sensitivity/          Bayesian-optimisation sensitivity analyses
 plot/
   main/                 Main-figure scripts
   supplementary/        Supplementary-figure scripts for Figs. S1--S8

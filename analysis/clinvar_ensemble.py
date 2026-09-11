@@ -17,7 +17,7 @@ from scipy.stats import ttest_rel, wilcoxon
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import StratifiedGroupKFold
 
-from ensemble_optim import bayes_optimize_weights, grid_optimize_weights
+from ensemble_optim import grid_optimize_weights
 
 
 PATHOGENIC_LABELS = {"pathogenic", "likely_pathogenic"}
@@ -82,11 +82,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=16)
     parser.add_argument("--pair-grid-step", type=float, default=0.01)
     parser.add_argument("--triple-grid-step", type=float, default=0.05)
-    parser.add_argument("--optimizer", choices=["grid", "bayes"], default="grid")
-    parser.add_argument("--bayes-init", type=int, default=10)
-    parser.add_argument("--bayes-iter", type=int, default=20)
-    parser.add_argument("--bayes-pair-step", type=float, default=0.001)
-    parser.add_argument("--bayes-triple-step", type=float, default=0.01)
     parser.add_argument("--write-score-tables", action="store_true")
     return parser.parse_args()
 
@@ -216,21 +211,10 @@ def main() -> None:
                     df.iloc[train_idx][SCORE_COLUMNS[component]].to_numpy()
                     for component in components
                 ]
-                if args.optimizer == "bayes":
-                    step = args.bayes_pair_step if len(components) == 2 else args.bayes_triple_step
-                    weights, train_auc, n_objective_evals = bayes_optimize_weights(
-                        y_train,
-                        train_scores,
-                        seed=args.seed + 1000 * fold + len(rows),
-                        n_init=args.bayes_init,
-                        n_iter=args.bayes_iter,
-                        candidate_step=step,
-                    )
-                else:
-                    step = args.pair_grid_step if len(components) == 2 else args.triple_grid_step
-                    weights, train_auc, n_objective_evals = grid_optimize_weights(
-                        y_train, train_scores, step
-                    )
+                step = args.pair_grid_step if len(components) == 2 else args.triple_grid_step
+                weights, train_auc, n_objective_evals = grid_optimize_weights(
+                    y_train, train_scores, step
+                )
 
             if len(components) == 1:
                 train_auc = roc_auc_score(
@@ -253,7 +237,7 @@ def main() -> None:
                     "fold": fold,
                     "model": model_name,
                     "components": " + ".join(components),
-                    "optimizer": args.optimizer,
+                    "optimizer": "grid",
                     "train_auc_at_selected_weights": train_auc,
                     "n_objective_evals": n_objective_evals,
                     "test_auc": roc_auc_score(y_test, test_score),

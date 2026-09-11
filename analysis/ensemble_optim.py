@@ -3,13 +3,7 @@
 
 from __future__ import annotations
 
-import warnings
-
 import numpy as np
-from scipy.stats import norm
-from sklearn.exceptions import ConvergenceWarning
-from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import ConstantKernel, Matern
 from sklearn.metrics import roc_auc_score
 
 
@@ -48,70 +42,3 @@ def grid_optimize_weights(
     best = int(np.argmax(values))
     return tuple(candidates[best]), float(values[best]), int(len(candidates))
 
-
-def bayes_optimize_weights(
-    y: np.ndarray,
-    scores: list[np.ndarray],
-    *,
-    seed: int,
-    n_init: int = 10,
-    n_iter: int = 20,
-    candidate_step: float = 0.001,
-    xi: float = 0.001,
-) -> tuple[tuple[float, ...], float, int]:
-    """Optimise AUROC with a Gaussian-process expected-improvement search.
-
-    The search is performed over a dense finite pool on the convex simplex.
-    Simplex vertices and the equal-weight point are always evaluated before
-    random initialisation so boundary optima are not missed solely by chance.
-    """
-
-    candidates = _candidate_pool(len(scores), candidate_step)
-    rng = np.random.default_rng(seed)
-
-    anchors = [int(np.argmin(np.linalg.norm(candidates - target, axis=1))) for target in np.eye(len(scores))]
-    anchors.append(
-        int(
-            np.argmin(
-                np.linalg.norm(candidates - np.repeat(1.0 / len(scores), len(scores)), axis=1)
-            )
-        )
-    )
-    evaluated = list(dict.fromkeys(anchors))
-    remaining = np.setdiff1d(np.arange(len(candidates)), evaluated, assume_unique=False)
-    n_random = max(0, min(n_init, len(candidates)) - len(evaluated))
-    if n_random:
-        evaluated.extend(rng.choice(remaining, size=n_random, replace=False).tolist())
-
-    values = [_objective(y, scores, candidates[idx]) for idx in evaluated]
-    kernel = ConstantKernel(1.0, (1e-3, 1e3)) * Matern(
-        length_scale=np.repeat(0.2, len(scores)),
-        length_scale_bounds=(1e-3, 10.0),
-        nu=2.5,
-    )
-
-    for iteration in range(n_iter):
-        available = np.setdiff1d(np.arange(len(candidates)), evaluated, assume_unique=False)
-        if len(available) == 0:
-            break
-        gp = GaussianProcessRegressor(
-            kernel=kernel,
-            alpha=1e-7,
-            normalize_y=True,
-            random_state=seed + iteration,
-            optimizer=None,
-        )
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", ConvergenceWarning)
-            gp.fit(candidates[evaluated], np.asarray(values))
-        mean, std = gp.predict(candidates[available], return_std=True)
-        improvement = mean - max(values) - xi
-        z = np.divide(improvement, std, out=np.zeros_like(improvement), where=std > 0)
-        expected_improvement = improvement * norm.cdf(z) + std * norm.pdf(z)
-        expected_improvement[std <= 1e-12] = 0.0
-        chosen = int(available[int(np.argmax(expected_improvement))])
-        evaluated.append(chosen)
-        values.append(_objective(y, scores, candidates[chosen]))
-
-    best = int(np.argmax(values))
-    return tuple(candidates[evaluated[best]]), float(values[best]), int(len(evaluated))
