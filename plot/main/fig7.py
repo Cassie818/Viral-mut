@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 
 BASE = Path("Results/ClinMAVE/cross_platform_context")
-PAIR_TABLE = BASE / "dataset_pair_modality_weights_11_gene_pairs_table.csv"
+PAIR_TABLE = BASE / "dataset_pair_modality_weights_11_gene_pairs_table_standardized.csv"
 OUTS = [Path("Figure/fig7.png")]
 
 
@@ -52,15 +52,15 @@ def load_data() -> pd.DataFrame:
                 "Gene",
                 "pair_id",
                 "n_variants",
-                f"DMS_weight_{model_short}",
-                f"CBGE_weight_{model_short}",
-                f"delta_weight_{model_short}",
+                f"DMS_weight_standardized_{model_short}",
+                f"CBGE_weight_standardized_{model_short}",
+                f"delta_weight_standardized_{model_short}",
             ]
         ].rename(
             columns={
-                f"DMS_weight_{model_short}": "mean_calm_weight_DMS",
-                f"CBGE_weight_{model_short}": "mean_calm_weight_CBGE",
-                f"delta_weight_{model_short}": "delta_CBGE_minus_DMS",
+                f"DMS_weight_standardized_{model_short}": "mean_calm_weight_DMS",
+                f"CBGE_weight_standardized_{model_short}": "mean_calm_weight_CBGE",
+                f"delta_weight_standardized_{model_short}": "delta_CBGE_minus_DMS",
             }
         )
         frame["model"] = model_label
@@ -116,7 +116,7 @@ def paired_panel(ax: plt.Axes, df: pd.DataFrame, model: str, color: str) -> None
     ax.set_xlim(-0.28, 1.28)
     ax.set_ylim(-0.03, 1.03)
     ax.set_xticks([0, 1], ["DMS", "CBGE"])
-    ax.set_ylabel("Optimised CaLM weight")
+    ax.set_ylabel("Scale-adjusted CaLM weight")
     ax.set_title(model, fontsize=9.2, pad=5)
     style_ax(ax)
 
@@ -200,8 +200,8 @@ def baseline_sensitivity(ax: plt.Axes, df: pd.DataFrame) -> None:
     ax.axvline(0, color="#C9C9C4", linewidth=1.0, zorder=1)
     ax.set_xlim(lim)
     ax.set_ylim(lim)
-    ax.set_xlabel(r"$\Delta w$ with ESM-2 (150M)")
-    ax.set_ylabel(r"$\Delta w$ with ESM-2 (650M)")
+    ax.set_xlabel(r"$\Delta w^{\mathrm{scale}}$ with ESM-2 (150M)")
+    ax.set_ylabel(r"$\Delta w^{\mathrm{scale}}$ with ESM-2 (650M)")
     style_ax(ax)
 
 

@@ -447,6 +447,11 @@ def main() -> None:
     setup()
     FIG_DIR.mkdir(parents=True, exist_ok=True)
     df = pd.read_csv(BASE / "gene_level_codon_contribution_summary.csv")
+    standardized = pd.read_csv(BASE / "fig6_standardized_equivalent_weight_summary.csv")
+    standardized = standardized[standardized["model"] == "ESM-2 650M + CaLM"][
+        ["gene", "mean_standardized_equivalent_calm_weight"]
+    ]
+    df = df.merge(standardized, on="gene", how="left", validate="one_to_one")
 
     fig = plt.figure(figsize=(5.85, 5.35))
     gs = fig.add_gridspec(2, 2, height_ratios=[1.12, 0.95], wspace=0.22, hspace=0.42)
@@ -458,9 +463,9 @@ def main() -> None:
     scatter_with_fit(
         ax_a,
         df,
-        "esm2_calm_weight",
+        "mean_standardized_equivalent_calm_weight",
         "esm2_cross_modal_gain",
-        r"$\bar{w}_g$",
+        r"$\bar{w}^{\mathrm{scale}}_g$",
         r"$\Delta\mathrm{AUROC}_{+\mathrm{CaLM}}$",
         ROSE,
         show_stats=False,
@@ -481,9 +486,9 @@ def main() -> None:
     top_gene_bar_panel(
         ax_c1,
         df,
-        "esm2_calm_weight",
-        "Top genes by CaLM weight",
-        r"$\bar{w}_g$",
+        "mean_standardized_equivalent_calm_weight",
+        "Top genes by scale-adjusted CaLM weight",
+        r"$\bar{w}^{\mathrm{scale}}_g$",
         "{:.2f}",
         n=10,
         xlim=(0, 1.02),

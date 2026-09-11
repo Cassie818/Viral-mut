@@ -352,9 +352,7 @@ def main() -> None:
     )
     sensitivity.to_csv(OUT_DIR / "gene_level_independent_signal_sensitivity.csv", index=False)
 
-    write_gene_list(ranked, "esm2_top_codon_weight_decile", "esm2_calm_weight", "esm2_top_codon_weight_decile_genes.csv")
     write_gene_list(ranked, "esm2_top_cross_modal_gain_decile", "esm2_cross_modal_gain", "esm2_top_cross_modal_gain_decile_genes.csv")
-    write_gene_list(ranked, "esm1b_top_codon_weight_decile", "esm1b_calm_weight", "esm1b_top_codon_weight_decile_genes.csv")
     write_gene_list(ranked, "esm1b_top_gain_decile", "esm1b_gain_over_protein", "esm1b_top_gain_decile_genes.csv")
     write_ranked_set_tables(ranked)
 
