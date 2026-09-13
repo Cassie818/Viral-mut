@@ -1,0 +1,4 @@
+analysis,analysis_role,estimand,n_weight_differences,n_dataset_pairs,n_genes,n_positive_differences,median_delta_weight_standardized,gene_cluster_bootstrap_95ci_low,gene_cluster_bootstrap_95ci_high,exact_gene_block_sign_flip_p_two_sided,sign_flip_patterns,bootstrap_replicates,random_seed
+Combined PLM backgrounds,combined-background analysis,median pair-level CBGE minus DMS scale-adjusted CaLM weight,27,27,11,24,0.16144914108384237,0.04254705811219345,0.29286236241327884,0.03125,2048,10000,16
+ESM-2 (150M),background-specific sensitivity analysis,median pair-level CBGE minus DMS scale-adjusted CaLM weight,27,27,11,21,0.1539808981980732,0.025816755496314053,0.3917740867042985,0.015625,2048,10000,16
+ESM-2 (650M),background-specific sensitivity analysis,median pair-level CBGE minus DMS scale-adjusted CaLM weight,27,27,11,18,0.1305810669535486,-0.01693015427618695,0.3631301648073757,0.078125,2048,10000,16

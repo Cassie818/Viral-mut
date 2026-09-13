@@ -20,41 +20,6 @@ IN_DIR = Path("Results/Revision/len1022_core_clinvar")
 OUT_DIR = Path("Results/ClinVar/gene_level")
 
 
-def fit_regression(df: pd.DataFrame, x_col: str, y_col: str, label: str, weighted: bool) -> dict[str, object]:
-    reg_df = df.dropna(subset=[x_col, y_col, "n_pathogenic", "n_benign"]).copy()
-    x = sm.add_constant(reg_df[x_col].to_numpy(float), has_constant="add")
-    y = reg_df[y_col].to_numpy(float)
-    if weighted:
-        weights = (
-            reg_df["n_pathogenic"].to_numpy(float)
-            * reg_df["n_benign"].to_numpy(float)
-            / (reg_df["n_pathogenic"].to_numpy(float) + reg_df["n_benign"].to_numpy(float))
-        )
-        model = sm.WLS(y, x, weights=weights).fit(cov_type="HC3")
-        method = "WLS_HC3"
-        weight_definition = "n_pathogenic*n_benign/(n_pathogenic+n_benign)"
-    else:
-        model = sm.OLS(y, x).fit(cov_type="HC3")
-        method = "OLS_HC3"
-        weight_definition = ""
-    ci_low, ci_high = model.conf_int(alpha=0.05)[1]
-    return {
-        "analysis": label,
-        "method": method,
-        "weighted": int(weighted),
-        "n_genes": int(len(reg_df)),
-        "x_column": x_col,
-        "y_column": y_col,
-        "weight_definition": weight_definition,
-        "intercept": float(model.params[0]),
-        "slope": float(model.params[1]),
-        "slope_95ci_low": float(ci_low),
-        "slope_95ci_high": float(ci_high),
-        "p_value": float(model.pvalues[1]),
-        "r_squared": float(model.rsquared),
-    }
-
-
 def fit_spearman_and_top5_sensitivity(df: pd.DataFrame, x_col: str, y_col: str, label: str) -> dict[str, object]:
     reg_df = df.dropna(subset=[x_col, y_col, "n_pathogenic", "n_benign"]).copy()
     rho, rho_p = spearmanr(reg_df[x_col], reg_df[y_col])
@@ -261,78 +226,6 @@ def main() -> None:
     ).to_csv(
         OUT_DIR / "gene_level_baseline_adjusted_regression.csv", index=False
     )
-
-    regressions = pd.DataFrame(
-        [
-            fit_regression(ranked, "esm2_calm_weight", "esm2_cross_modal_gain", "esm2_weight_predicts_cross_modal_gain", False),
-            fit_regression(ranked, "esm2_calm_weight", "esm2_cross_modal_gain", "weighted_esm2_weight_predicts_cross_modal_gain", True),
-            fit_regression(
-                ranked,
-                "esm2_independent_calm_signal",
-                "esm2_cross_modal_gain",
-                "esm2_independent_calm_signal_predicts_cross_modal_gain",
-                False,
-            ),
-            fit_regression(
-                ranked,
-                "esm2_independent_calm_signal",
-                "esm2_cross_modal_gain",
-                "weighted_esm2_independent_calm_signal_predicts_cross_modal_gain",
-                True,
-            ),
-            fit_regression(
-                ranked,
-                "esm2_calm_weight",
-                "esm2_cross_modal_advantage",
-                "esm2_weight_predicts_cross_modal_advantage",
-                False,
-            ),
-            fit_regression(
-                ranked,
-                "esm2_calm_weight",
-                "esm2_cross_modal_advantage",
-                "weighted_esm2_weight_predicts_cross_modal_advantage",
-                True,
-            ),
-            fit_regression(
-                ranked,
-                "esm2_independent_calm_signal",
-                "esm2_cross_modal_advantage",
-                "esm2_independent_calm_signal_predicts_cross_modal_advantage",
-                False,
-            ),
-            fit_regression(
-                ranked,
-                "esm2_independent_calm_signal",
-                "esm2_cross_modal_advantage",
-                "weighted_esm2_independent_calm_signal_predicts_cross_modal_advantage",
-                True,
-            ),
-            fit_regression(ranked, "esm1b_calm_weight", "esm1b_gain_over_protein", "esm1b_weight_predicts_gain_over_esm1b", False),
-            fit_regression(
-                ranked,
-                "esm1b_calm_weight",
-                "esm1b_gain_over_protein",
-                "weighted_esm1b_weight_predicts_gain_over_esm1b",
-                True,
-            ),
-            fit_regression(
-                ranked,
-                "esm1b_independent_calm_signal",
-                "esm1b_gain_over_protein",
-                "esm1b_independent_calm_signal_predicts_gain_over_esm1b",
-                False,
-            ),
-            fit_regression(
-                ranked,
-                "esm1b_independent_calm_signal",
-                "esm1b_gain_over_protein",
-                "weighted_esm1b_independent_calm_signal_predicts_gain_over_esm1b",
-                True,
-            ),
-        ]
-    )
-    regressions.to_csv(OUT_DIR / "gene_level_codon_contribution_regressions.csv", index=False)
 
     sensitivity = pd.DataFrame(
         [

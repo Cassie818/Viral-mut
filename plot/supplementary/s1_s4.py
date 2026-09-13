@@ -2,7 +2,6 @@
 """Supplementary materials for ClinVar model-control analyses.
 
 Outputs:
-- all pairwise fold-level statistics, including non-significant comparisons
 - fold-level delta AUROC distributions for planned contrasts
 - gene-wise versus variant-wise CV comparison
 - same-modality placeholder control for generic ensembling
@@ -12,14 +11,12 @@ Outputs:
 from __future__ import annotations
 
 import os
-from itertools import combinations
 from pathlib import Path
 
 os.environ.setdefault("MPLCONFIGDIR", "/tmp/viral_mut_mpl_cache")
 
 import numpy as np
 import pandas as pd
-from scipy.stats import ttest_rel, wilcoxon
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import StratifiedKFold
 
@@ -156,61 +153,6 @@ def best_weights(y_train: np.ndarray, train_scores: list[np.ndarray], candidates
             best_auc = auc
             best_candidate = weights
     return best_candidate
-
-
-def all_pairwise_tests(fold_df: pd.DataFrame) -> pd.DataFrame:
-    wide = fold_df.pivot(index="fold", columns="model", values="test_auc")
-    summary = fold_df.groupby("model")["test_auc"].agg(["mean", "std"]).rename(columns={"mean": "mean_auc", "std": "sd_auc"})
-    planned_unordered = {frozenset((a, b)) for a, b, _ in PLANNED_CONTRASTS}
-    rows = []
-
-    def add_row(a: str, b: str, planned_contrast: bool, contrast_label: str) -> None:
-        delta = wide[a] - wide[b]
-        try:
-            wp = float(wilcoxon(delta).pvalue)
-        except ValueError:
-            wp = np.nan
-        paired_p = float(ttest_rel(wide[a], wide[b]).pvalue)
-        rows.append(
-            {
-                "contrast_label": contrast_label,
-                "model_a": a,
-                "model_b": b,
-                "mean_auc_a": float(summary.loc[a, "mean_auc"]),
-                "mean_auc_b": float(summary.loc[b, "mean_auc"]),
-                "mean_delta_a_minus_b": float(delta.mean()),
-                "sd_delta": float(delta.std(ddof=1)),
-                "sem_delta": float(delta.sem()),
-                "paired_t_p": paired_p,
-                "wilcoxon_p": wp,
-                "significance_paired_t": p_label(paired_p),
-                "planned_contrast": planned_contrast,
-                "fold_deltas": ";".join(f"{v:.5f}" for v in delta),
-            }
-        )
-
-    for a, b, label in PLANNED_CONTRASTS:
-        add_row(a, b, True, label)
-
-    for a, b in combinations([name for name, _ in MODEL_SPECS], 2):
-        if frozenset((a, b)) in planned_unordered:
-            continue
-        add_row(a, b, False, f"{a} vs {b}")
-
-    out = pd.DataFrame(rows)
-    return out
-
-
-def p_label(p: float) -> str:
-    if not np.isfinite(p):
-        return "n.s."
-    if p < 0.001:
-        return "***"
-    if p < 0.01:
-        return "**"
-    if p < 0.05:
-        return "*"
-    return "n.s."
 
 
 def evaluate_variantwise(df: pd.DataFrame, n_splits: int = 10, seed: int = 16) -> pd.DataFrame:
@@ -378,14 +320,6 @@ def same_modality_placeholder_control(gene_folds: pd.DataFrame) -> pd.DataFrame:
     )
     out.to_csv(OUT_DIR / "model_control_same_modality_placeholder_fold_deltas.csv", index=False)
 
-    try:
-        wilcoxon_weak_p = float(wilcoxon(out["calm_minus_weak_placeholder_gain"]).pvalue)
-    except ValueError:
-        wilcoxon_weak_p = np.nan
-    try:
-        wilcoxon_strong_p = float(wilcoxon(out["calm_minus_strong_placeholder_gain"]).pvalue)
-    except ValueError:
-        wilcoxon_strong_p = np.nan
     summary = pd.DataFrame(
         [
             {
@@ -427,14 +361,6 @@ def same_modality_placeholder_control(gene_folds: pd.DataFrame) -> pd.DataFrame:
                 "sd_calm_minus_strong_placeholder_gain": float(
                     out["calm_minus_strong_placeholder_gain"].std(ddof=1)
                 ),
-                "paired_t_p_calm_gain_vs_weak_placeholder_gain": float(
-                    ttest_rel(out["calm_gain"], out["weak_same_modality_placeholder_gain"]).pvalue
-                ),
-                "wilcoxon_p_calm_gain_vs_weak_placeholder_gain": wilcoxon_weak_p,
-                "paired_t_p_calm_gain_vs_strong_placeholder_gain": float(
-                    ttest_rel(out["calm_gain"], out["strong_same_modality_placeholder_gain"]).pvalue
-                ),
-                "wilcoxon_p_calm_gain_vs_strong_placeholder_gain": wilcoxon_strong_p,
                 "fraction_folds_calm_gain_exceeds_weak_placeholder_gain": float(
                     (out["calm_gain"] > out["weak_same_modality_placeholder_gain"]).mean()
                 ),
@@ -642,8 +568,6 @@ def main() -> None:
     gene_folds = pd.read_csv(FOLD_RESULTS)
     score_df = pd.read_csv(SCORE_TABLE)
 
-    all_pairwise = all_pairwise_tests(gene_folds)
-    all_pairwise.to_csv(OUT_DIR / "supp_table_model_control_all_pairwise_tests.csv", index=False)
     score_correlation = write_score_correlation_audit(score_df)
     placeholder_df = same_modality_placeholder_control(gene_folds)
 
@@ -659,7 +583,6 @@ def main() -> None:
     plot_same_modality_placeholder_control(placeholder_df)
     plot_weight_distribution(gene_folds)
 
-    print(OUT_DIR / "supp_table_model_control_all_pairwise_tests.csv")
     print(OUT_DIR / "model_control_added_scorer_correlation_audit.csv")
     print(OUT_DIR / "supp_table_model_control_scorer_correlations.csv")
     print(OUT_DIR / "model_control_same_modality_placeholder_fold_deltas.csv")

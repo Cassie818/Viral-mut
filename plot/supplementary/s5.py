@@ -78,7 +78,7 @@ def write_latex_covariate_table(table: pd.DataFrame, output_path: Path) -> None:
     output_path.write_text("\n".join(lines), encoding="utf-8")
 
 
-def plot_conditional_deltas(paired: pd.DataFrame, figure_path: Path) -> None:
+def plot_conditional_deltas(folds: pd.DataFrame, figure_path: Path) -> None:
     contrasts = [
         (
             "CaLM beyond mutational context",
@@ -93,10 +93,11 @@ def plot_conditional_deltas(paired: pd.DataFrame, figure_path: Path) -> None:
             COLORS["context"],
         ),
     ]
+    wide = folds.pivot(index="fold", columns="model", values="test_auc")
     rows = []
     for label, a, b, color in contrasts:
-        record = paired[(paired["a"] == a) & (paired["b"] == b)].iloc[0]
-        for fold, value in enumerate(str(record["fold_deltas"]).split(";"), start=1):
+        delta = (wide[a] - wide[b]).dropna()
+        for fold, value in delta.items():
             rows.append({"contrast": label, "fold": fold, "delta": float(value), "color": color})
     values = pd.DataFrame(rows)
 
@@ -152,13 +153,11 @@ def main() -> None:
     figure_dir.mkdir(parents=True, exist_ok=True)
 
     folds = pd.read_csv(input_dir / "context_control_fold_results.csv")
-    paired = pd.read_csv(input_dir / "context_control_paired_tests.csv")
-
     write_latex_covariate_table(
         context_covariates(),
         table_dir / "Supplementary_Table_S4_mutational_context_covariates.tex",
     )
-    plot_conditional_deltas(paired, figure_dir / "figS5.png")
+    plot_conditional_deltas(folds, figure_dir / "figS5.png")
 
 
 if __name__ == "__main__":

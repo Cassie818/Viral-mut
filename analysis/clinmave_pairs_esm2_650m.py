@@ -8,7 +8,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from scipy.stats import wilcoxon
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import StratifiedKFold
 
@@ -19,6 +18,29 @@ ESM2_650M = Path("Results/Revision/ClinMAVE_ESM2_650M/clinmave_missense_all_with
 CALM_BASE = Path("Results/ClinMAVE")
 OUTDIR = Path("Results/Revision/ClinMAVE_api_cross_platform/dataset_pair_modality_weights")
 WEIGHTS = np.linspace(0.0, 1.0, 201)
+MAX_FOLDS = 10
+RANDOM_SEED = 16
+MIN_PREMATCH_CLASS_COUNT = 5
+ELIGIBILITY_COUNT_COLUMNS = [
+    "DMS_cases",
+    "DMS_controls",
+    "CBGE_cases",
+    "CBGE_controls",
+]
+
+
+def load_pairs() -> pd.DataFrame:
+    pairs = pd.read_csv(PAIRS)
+    missing = set(ELIGIBILITY_COUNT_COLUMNS) - set(pairs.columns)
+    if missing:
+        raise ValueError(f"Pair eligibility table is missing columns: {sorted(missing)}")
+    eligible = pairs[ELIGIBILITY_COUNT_COLUMNS].ge(MIN_PREMATCH_CLASS_COUNT).all(axis=1)
+    if not eligible.all():
+        raise ValueError(
+            "Every candidate pair must have at least five normal and five LoF "
+            "variants on each platform before score matching"
+        )
+    return pairs
 
 
 def platform(value: str) -> str | None:
@@ -123,14 +145,14 @@ def best_weight(train: pd.DataFrame, label_col: str) -> float:
     return best_w
 
 
-def evaluate_pair(table: pd.DataFrame, random_state: int = 16) -> pd.DataFrame:
+def evaluate_pair(table: pd.DataFrame, random_state: int = RANDOM_SEED) -> pd.DataFrame:
     if table.empty:
         return pd.DataFrame()
     split_y = table["DMS_label"].astype(str) + "_" + table["CBGE_label"].astype(str)
     min_stratum = split_y.value_counts().min()
     if pd.isna(min_stratum):
         return pd.DataFrame()
-    n_splits = min(10, int(min_stratum))
+    n_splits = min(MAX_FOLDS, int(min_stratum))
     if n_splits < 2:
         return pd.DataFrame()
     cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=random_state)
@@ -139,26 +161,13 @@ def evaluate_pair(table: pd.DataFrame, random_state: int = 16) -> pd.DataFrame:
         train = table.iloc[train_idx]
         test = table.iloc[test_idx]
         for platform, label_col in [("DMS", "DMS_label"), ("CBGE", "CBGE_label")]:
-            y_test = test[label_col].to_numpy(int)
             w = best_weight(train, label_col)
-            evaluable = len(np.unique(y_test)) == 2 and np.isfinite(w)
-            if evaluable:
-                prot = test["esm2_650m_llr"].to_numpy(float)
-                calm = test["calm_llr"].to_numpy(float)
-                combo = w * calm + (1.0 - w) * prot
-                auroc_prot = roc_auc_score(y_test, -prot)
-                auroc_calm = roc_auc_score(y_test, -calm)
-                auroc_combo = roc_auc_score(y_test, -combo)
-            else:
-                auroc_prot = auroc_calm = auroc_combo = np.nan
+            y_test = test[label_col].to_numpy(int)
             rows.append(
                 {
                     "fold": fold,
                     "platform": platform,
                     "calm_weight": w,
-                    "auroc_esm2_650m": auroc_prot,
-                    "auroc_calm": auroc_calm,
-                    "auroc_combo": auroc_combo,
                     "n_test": len(test),
                     "n_test_cases": int(y_test.sum()),
                     "n_test_controls": int((1 - y_test).sum()),
@@ -170,7 +179,7 @@ def evaluate_pair(table: pd.DataFrame, random_state: int = 16) -> pd.DataFrame:
 def main() -> None:
     OUTDIR.mkdir(parents=True, exist_ok=True)
     records = load_records()
-    pairs = pd.read_csv(PAIRS)
+    pairs = load_pairs()
     scores = load_scores()
 
     matched_rows = []
@@ -195,72 +204,8 @@ def main() -> None:
     matched = pd.concat(matched_rows, ignore_index=True) if matched_rows else pd.DataFrame()
     folds = pd.concat(fold_rows, ignore_index=True) if fold_rows else pd.DataFrame()
 
-    summary_rows = []
-    if not folds.empty:
-        for (pair_id, platform), sub in folds.groupby(["pair_id", "platform"]):
-            meta = sub.iloc[0][["Gene", "DMS_dataset", "CBGE_dataset"]].to_dict()
-            mt = matched[matched["pair_id"] == pair_id]
-            label_col = f"{platform}_label"
-            summary_rows.append(
-                {
-                    "pair_id": pair_id,
-                    **meta,
-                    "platform": platform,
-                    "n_variants": len(mt),
-                    "n_cases": int(mt[label_col].sum()),
-                    "n_controls": int((1 - mt[label_col]).sum()),
-                    "label_concordance": float((mt["DMS_label"] == mt["CBGE_label"]).mean()),
-                    "n_folds": sub["fold"].nunique(),
-                    "mean_calm_weight": sub["calm_weight"].mean(),
-                    "sd_calm_weight": sub["calm_weight"].std(ddof=1),
-                    "mean_auroc_esm2_650m": sub["auroc_esm2_650m"].mean(),
-                    "mean_auroc_calm": sub["auroc_calm"].mean(),
-                    "mean_auroc_combo": sub["auroc_combo"].mean(),
-                    "mean_delta_combo_vs_esm2_650m": (sub["auroc_combo"] - sub["auroc_esm2_650m"]).mean(),
-                }
-            )
-    summary = pd.DataFrame(summary_rows)
-    tests = []
-    for pair_id, sub in folds.groupby("pair_id") if not folds.empty else []:
-        wide = sub.pivot(index="fold", columns="platform", values="calm_weight").dropna()
-        row = {"pair_id": pair_id, "paired_folds": len(wide)}
-        if {"DMS", "CBGE"}.issubset(wide.columns) and len(wide) >= 2:
-            diff = wide["CBGE"] - wide["DMS"]
-            row["delta_CBGE_minus_DMS"] = float(diff.mean())
-            row["p_wilcoxon"] = 1.0 if np.allclose(diff, 0) else wilcoxon(wide["CBGE"], wide["DMS"]).pvalue
-        tests.append(row)
-    tests = pd.DataFrame(tests)
-    if not summary.empty and not tests.empty:
-        summary = summary.merge(tests, on="pair_id", how="left")
-
     matched.to_csv(OUTDIR / "dataset_pair_matched_variants_with_scores.csv", index=False)
-    folds.to_csv(OUTDIR / "dataset_pair_fold_metrics.csv", index=False)
-    summary.to_csv(OUTDIR / "dataset_pair_summary.csv", index=False)
-
-    compact = summary.pivot_table(
-        index=["pair_id", "Gene", "DMS_dataset", "CBGE_dataset", "n_variants", "label_concordance"],
-        columns="platform",
-        values=["mean_calm_weight", "mean_auroc_esm2_650m", "mean_auroc_calm", "mean_auroc_combo"],
-        aggfunc="first",
-    )
-    compact.columns = [f"{metric}_{platform}" for metric, platform in compact.columns]
-    compact = compact.reset_index().merge(tests, on="pair_id", how="left")
-    compact = compact.sort_values(["n_variants", "Gene"], ascending=[False, True])
-    compact.to_csv(OUTDIR / "dataset_pair_summary_compact.csv", index=False)
-
-    print("Compact summary")
-    show_cols = [
-        "Gene",
-        "DMS_dataset",
-        "CBGE_dataset",
-        "n_variants",
-        "label_concordance",
-        "mean_calm_weight_DMS",
-        "mean_calm_weight_CBGE",
-        "delta_CBGE_minus_DMS",
-        "p_wilcoxon",
-    ]
-    print(compact[show_cols].to_string(index=False))
+    folds.to_csv(OUTDIR / "dataset_pair_fold_weights.csv", index=False)
     print(f"\nWrote outputs to {OUTDIR}")
 
 

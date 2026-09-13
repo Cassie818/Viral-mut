@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.lines import Line2D
-from scipy.stats import t
 
 
 MODELS = {
@@ -20,7 +19,6 @@ MODELS = {
         "delta": "delta_combo_vs_esm2_650m",
         "plm_auroc": "auroc_esm2_650m",
         "ensemble_auroc": "auroc_esm2_650m_calm",
-        "p": "p_delta_combo_vs_esm2_650m_paired_t",
         "color": "#9BC9DD",
     },
     "ESM-1b (650M)": {
@@ -29,7 +27,6 @@ MODELS = {
         "delta": "delta_combo_vs_esm1b_650m",
         "plm_auroc": "auroc_esm1b_650m",
         "ensemble_auroc": "auroc_esm1b_650m_calm",
-        "p": "p_delta_combo_vs_esm1b_650m_paired_t",
         "color": "#BFD8A8",
     },
 }
@@ -54,22 +51,6 @@ def load_results(input_dir: Path) -> tuple[dict[str, pd.DataFrame], dict[str, pd
     return folds, summaries
 
 
-def confidence_interval(values: pd.Series) -> tuple[float, float]:
-    values = values.dropna().to_numpy(float)
-    if len(values) < 2:
-        return np.nan, np.nan
-    half_width = t.ppf(0.975, len(values) - 1) * values.std(ddof=1) / np.sqrt(len(values))
-    return float(values.mean() - half_width), float(values.mean() + half_width)
-
-
-def p_display(value: float) -> str:
-    if not np.isfinite(value):
-        return "NA"
-    if value < 0.001:
-        return f"{value:.1e}"
-    return f"{value:.3f}"
-
-
 def build_summary_table(folds: dict[str, pd.DataFrame], summaries: dict[str, pd.DataFrame]) -> pd.DataFrame:
     rows = []
     for assay, case_class in GROUPS:
@@ -79,7 +60,6 @@ def build_summary_table(folds: dict[str, pd.DataFrame], summaries: dict[str, pd.
             summary = summaries[model]
             subsummary = summary[(summary["assay"] == assay) & (summary["case_class"] == case_class)].iloc[0]
             delta = subfold[config["delta"]]
-            ci_low, ci_high = confidence_interval(delta)
             rows.append(
                 {
                     "assay": assay,
@@ -94,11 +74,7 @@ def build_summary_table(folds: dict[str, pd.DataFrame], summaries: dict[str, pd.
                     "plm_auroc": float(subfold[config["plm_auroc"]].mean()),
                     "ensemble_auroc": float(subfold[config["ensemble_auroc"]].mean()),
                     "delta_auroc": float(delta.mean()),
-                    "ci95_delta_low": ci_low,
-                    "ci95_delta_high": ci_high,
-                    "paired_t_p": float(subsummary[config["p"]]),
-                    "paired_t_p_display": p_display(float(subsummary[config["p"]])),
-                    "ci95_crosses_zero": bool(ci_low <= 0 <= ci_high),
+                    "sd_delta_auroc": float(delta.std(ddof=1)),
                 }
             )
     return pd.DataFrame(rows)
@@ -125,8 +101,7 @@ def plot_gof_deltas(folds: dict[str, pd.DataFrame], figure_path: Path) -> None:
             y = np.full(len(values), index, dtype=float) + rng.normal(0, 0.045, len(values))
             ax.scatter(values, y, s=28, color=config["color"], edgecolor=EDGE, linewidth=0.45, zorder=3)
             if len(values):
-                low, high = confidence_interval(pd.Series(values))
-                ax.errorbar(values.mean(), index, xerr=[[values.mean() - low], [high - values.mean()]], fmt="o", color=TEXT, markersize=3.8, capsize=3, linewidth=0.9, zorder=4)
+                ax.errorbar(values.mean(), index, xerr=values.std(ddof=1), fmt="o", color=TEXT, markersize=3.8, capsize=3, linewidth=0.9, zorder=4)
         ax.axvline(0, color="#A8A8A3", linestyle=(0, (3, 2)), linewidth=0.8)
         ax.set_title(assay, fontsize=9, fontweight="normal", color=TEXT)
         ax.set_yticks([0, 1])

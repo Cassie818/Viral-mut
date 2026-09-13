@@ -13,7 +13,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from scipy.stats import ttest_rel, wilcoxon
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import StratifiedGroupKFold
 
@@ -117,44 +116,6 @@ def load_scores(args: argparse.Namespace) -> pd.DataFrame:
     df = df.merge(esm2, on=KEY_COLS, how="left", validate="one_to_one")
     df = df.merge(esm1b, on=KEY_COLS, how="left", validate="one_to_one")
     return df
-
-
-def paired_tests(fold_df: pd.DataFrame) -> pd.DataFrame:
-    comparisons = [
-        ("ESM-2 150M + ESM-2 650M", "ESM-2 650M"),
-        ("ESM-2 650M + ESM-1b 650M", "ESM-2 650M"),
-        ("ESM-2 650M + CaLM", "ESM-2 650M"),
-        ("ESM-1b 650M + CaLM", "ESM-1b 650M"),
-        ("ESM-2 650M + CaLM", "ESM-2 650M + ESM-1b 650M"),
-        (
-            "ESM-2 650M + ESM-1b 650M + CaLM",
-            "ESM-2 650M + ESM-1b 650M",
-        ),
-        (
-            "ESM-2 650M + ESM-1b 650M + CaLM",
-            "ESM-2 650M + CaLM",
-        ),
-    ]
-    wide = fold_df.pivot(index="fold", columns="model", values="test_auc")
-    rows = []
-    for a, b in comparisons:
-        delta = wide[a] - wide[b]
-        try:
-            wilcoxon_p = float(wilcoxon(delta).pvalue)
-        except ValueError:
-            wilcoxon_p = np.nan
-        rows.append(
-            {
-                "a": a,
-                "b": b,
-                "mean_delta": float(delta.mean()),
-                "sd_delta": float(delta.std(ddof=1)),
-                "paired_t_p": float(ttest_rel(wide[a], wide[b]).pvalue),
-                "wilcoxon_p": wilcoxon_p,
-                "fold_deltas": ";".join(f"{value:.5f}" for value in delta),
-            }
-        )
-    return pd.DataFrame(rows)
 
 
 def main() -> None:
@@ -284,7 +245,6 @@ def main() -> None:
 
     fold_df.to_csv(out_dir / "model_control_gene_heldout_fold_results.csv", index=False)
     summary.to_csv(out_dir / "model_control_gene_heldout_summary.csv", index=False)
-    paired_tests(fold_df).to_csv(out_dir / "model_control_paired_tests.csv", index=False)
     audit.to_csv(out_dir / "model_control_input_audit.csv", index=False)
     if oof[list(OOF_COLUMNS.values())].isna().any().any() or (oof["fold"] == 0).any():
         raise RuntimeError("Incomplete out-of-fold predictions")
@@ -292,7 +252,6 @@ def main() -> None:
 
     print(audit.to_string(index=False))
     print(summary.to_string(index=False, float_format=lambda value: f"{value:.4f}"))
-    print(paired_tests(fold_df).to_string(index=False, float_format=lambda value: f"{value:.4g}"))
 
 
 if __name__ == "__main__":

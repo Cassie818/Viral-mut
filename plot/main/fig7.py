@@ -208,8 +208,8 @@ def baseline_sensitivity(ax: plt.Axes, df: pd.DataFrame) -> None:
 
 def main() -> None:
     df = load_data()
-    fig = plt.figure(figsize=(6.10, 5.55))
-    gs = fig.add_gridspec(2, 2, height_ratios=[1, 1.03], wspace=0.27, hspace=0.24)
+    fig = plt.figure(figsize=(6.10, 5.00))
+    gs = fig.add_gridspec(2, 2, height_ratios=[1, 1.03], wspace=0.27, hspace=0.20)
     ax_a = fig.add_subplot(gs[0, 0])
     ax_b = fig.add_subplot(gs[0, 1])
     ax_c = fig.add_subplot(gs[1, 0])
@@ -223,7 +223,7 @@ def main() -> None:
     for label, ax in zip("ABCD", [ax_a, ax_b, ax_c, ax_d]):
         add_panel_label(ax, label)
 
-    fig.subplots_adjust(left=0.13, right=0.98, top=0.93, bottom=0.11)
+    fig.subplots_adjust(left=0.13, right=0.98, top=0.93, bottom=0.12)
     for out in OUTS:
         out.parent.mkdir(parents=True, exist_ok=True)
         fig.savefig(out, dpi=450)

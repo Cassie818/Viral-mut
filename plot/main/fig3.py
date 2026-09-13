@@ -103,18 +103,10 @@ def format_axes(ax: plt.Axes) -> None:
     ax.tick_params(axis="both", width=1.1, length=3.5, color=EDGE, labelcolor=DARK)
 
 
-def metric_columns(model: str) -> tuple[str, str, str]:
+def delta_sd_column(model: str) -> str:
     if model == "ESM-2 (650M)":
-        return (
-            "delta_combo_vs_esm2_650m_mean",
-            "delta_combo_vs_esm2_650m_sd",
-            "p_delta_combo_vs_esm2_650m_paired_t",
-        )
-    return (
-        "delta_combo_vs_esm1b_650m_mean",
-        "delta_combo_vs_esm1b_650m_sd",
-        "p_delta_combo_vs_esm1b_650m_paired_t",
-    )
+        return "delta_combo_vs_esm2_650m_sd"
+    return "delta_combo_vs_esm1b_650m_sd"
 
 
 def collect_plot_rows(
@@ -124,7 +116,7 @@ def collect_plot_rows(
     for group_index, (assay, case_class, group_label) in enumerate(GROUPS):
         for model in MODELS:
             row = row_for(summary, model, assay, case_class)
-            delta_mean, delta_sd, delta_p = metric_columns(model)
+            delta_sd = delta_sd_column(model)
             boot = bootstrap[
                 (bootstrap["plm_background"] == model)
                 & (bootstrap["assay"] == assay)
@@ -149,7 +141,6 @@ def collect_plot_rows(
                     "ci95_delta_low": boot["bootstrap_95ci_low"],
                     "ci95_delta_high": boot["bootstrap_95ci_high"],
                     "ci95_delta_crosses_zero": not bool(boot["ci_excludes_zero"]),
-                    "p_delta_auroc_vs_plm": row[delta_p],
                     "n_folds": int(row["n_folds"]),
                     "n_evaluable_folds": int(row["n_evaluable_folds"]),
                     "n_variants": int(row["n_variants"]),

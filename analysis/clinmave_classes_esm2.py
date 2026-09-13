@@ -8,7 +8,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from scipy.stats import ttest_rel
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import StratifiedGroupKFold
 
@@ -97,16 +96,6 @@ def safe_roc_auc(y: np.ndarray, score: np.ndarray) -> float:
     if len(np.unique(y)) < 2:
         return np.nan
     return float(roc_auc_score(y, score))
-
-
-def paired_t_p(a: pd.Series, b: pd.Series) -> float:
-    pairs = pd.concat([a, b], axis=1).dropna()
-    if len(pairs) < 2:
-        return np.nan
-    diff = pairs.iloc[:, 0] - pairs.iloc[:, 1]
-    if np.allclose(diff, diff.iloc[0]):
-        return np.nan
-    return float(ttest_rel(pairs.iloc[:, 0], pairs.iloc[:, 1]).pvalue)
 
 
 def make_splits(df: pd.DataFrame, folds: int, seed: int):
@@ -208,12 +197,6 @@ def evaluate_dataset(
     for col in ["auroc_esm2_650m", "auroc_calm", "auroc_esm2_650m_calm", "delta_combo_vs_esm2_650m", "delta_combo_vs_calm"]:
         summary[f"{col}_mean"] = fold_df[col].mean()
         summary[f"{col}_sd"] = fold_df[col].std(ddof=1)
-    summary["p_delta_combo_vs_esm2_650m_paired_t"] = paired_t_p(
-        fold_df["auroc_esm2_650m_calm"], fold_df["auroc_esm2_650m"]
-    )
-    summary["p_delta_combo_vs_calm_paired_t"] = paired_t_p(
-        fold_df["auroc_esm2_650m_calm"], fold_df["auroc_calm"]
-    )
     if oof[["score_plm", "score_calm", "score_ensemble"]].isna().any().any() or (oof["fold"] == 0).any():
         raise RuntimeError(f"Incomplete out-of-fold predictions for {assay} {case_class}")
     return fold_df, summary, oof
